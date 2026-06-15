@@ -113,7 +113,7 @@ class ContextManager(object):
         elif 'CausE' in flags_obj.model:
             return trainer.CausETrainer(flags_obj, cm, vm, dm)
         elif 'DIVRS' in flags_obj.model:
-            return trainer.DICETrainer(flags_obj, cm, vm, dm)
+            return trainer.DIVRSTrainer(flags_obj, cm, vm, dm)
         else:
             return trainer.PairTrainer(flags_obj, cm, vm, dm)
 

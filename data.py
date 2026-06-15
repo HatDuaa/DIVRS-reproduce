@@ -46,7 +46,7 @@ class FactorizationDataProcessor(object):
         return DataLoader(dataset, batch_size=flags_obj.batch_size, shuffle=flags_obj.shuffle, num_workers=flags_obj.num_workers, drop_last=True)
 
     @staticmethod
-    def get_DICE_dataloader(flags_obj, dm):
+    def get_DIVRS_dataloader(flags_obj, dm):
 
         dataset = DIVRSFactorizationDataset(flags_obj, dm)
 
