@@ -1,0 +1,6 @@
+data/
+output/
+*.pyc
+__pycache__/
+model_edited_backup.py
+*.pdf
