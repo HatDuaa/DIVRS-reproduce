@@ -424,24 +424,9 @@ class DIVRS(nn.Module):
         loss_cos_u = -torch.mean(torch.abs(torch.cosine_similarity(uiv[:, -1], users_ori[:, -1], dim=0)))
         loss_cos_i = -torch.mean(torch.abs(torch.cosine_similarity(iiv[:, -1], items_p_ori[:, -1], dim=0)))
 
-        device = uiv.device
-        uiv = uiv.cpu()
-        iiv = iiv.cpu()
-        try:
-            pinverse_uiv = torch.pinverse(torch.where(torch.isnan(uiv[:, -1]), torch.full_like(uiv[:, -1], 0), uiv[:, -1]))
-            pinverse_iiv = torch.pinverse(torch.where(torch.isnan(iiv[:, -1]), torch.full_like(iiv[:, -1], 0), iiv[:, -1]))
-        except:
-            print(uiv[:, -1])
-            print(iiv[:, -1])
-            print(torch.isnan(uiv[:, -1]).any())
-            print(torch.isinf(uiv[:, -1]).any())
-            print("===========================")
-            print(torch.isnan(iiv[:, -1]).any())
-            print(torch.isinf(iiv[:, -1]).any())
-        uiv = uiv.to(device)
-        iiv = iiv.to(device)
-        pinverse_iiv = pinverse_iiv.to(device)
-        pinverse_uiv = pinverse_uiv.to(device)
+        # Giữ pinverse trên GPU (bỏ vòng .cpu()/.to() mỗi batch -> nhanh hơn nhiều)
+        pinverse_uiv = torch.linalg.pinv(torch.nan_to_num(uiv[:, -1]))
+        pinverse_iiv = torch.linalg.pinv(torch.nan_to_num(iiv[:, -1]))
 
 
         users_iv_causal = torch.matmul(uiv[:, -1], torch.matmul(pinverse_uiv, users_iv[:, -1]))
@@ -607,26 +592,9 @@ class DIVRS_GCN(nn.Module):
         loss_cos_u = -torch.mean(torch.abs(torch.cosine_similarity(uiv[:, -1], users_ori[:, -1], dim=0)))
         loss_cos_i = -torch.mean(torch.abs(torch.cosine_similarity(iiv[:, -1], items_p_ori[:, -1], dim=0)))
 
-        device = self.iv.device
-        uiv = uiv.cpu()
-        iiv = iiv.cpu()
-        try:
-            pinverse_uiv = torch.pinverse(
-                torch.where(torch.isnan(uiv[:, -1]), torch.full_like(uiv[:, -1], 0), uiv[:, -1]))
-            pinverse_iiv = torch.pinverse(
-                torch.where(torch.isnan(iiv[:, -1]), torch.full_like(iiv[:, -1], 0), iiv[:, -1]))
-        except:
-            print(uiv[:, -1])
-            print(iiv[:, -1])
-            print(torch.isnan(uiv[:, -1]).any())
-            print(torch.isinf(uiv[:, -1]).any())
-            print("===========================")
-            print(torch.isnan(iiv[:, -1]).any())
-            print(torch.isinf(iiv[:, -1]).any())
-        uiv = uiv.to(device)
-        iiv = iiv.to(device)
-        pinverse_iiv = pinverse_iiv.to(device)
-        pinverse_uiv = pinverse_uiv.to(device)
+        # Giữ pinverse trên GPU (bỏ vòng .cpu()/.to() mỗi batch -> nhanh hơn nhiều)
+        pinverse_uiv = torch.linalg.pinv(torch.nan_to_num(uiv[:, -1]))
+        pinverse_iiv = torch.linalg.pinv(torch.nan_to_num(iiv[:, -1]))
 
 
         users_iv_causal = torch.matmul(uiv[:, -1], torch.matmul(pinverse_uiv, users_iv[:, -1]))
