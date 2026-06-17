@@ -60,6 +60,7 @@ flags.DEFINE_string('workspace', './', 'Path to load ckpt.')
 flags.DEFINE_string('output', 'XXXX', 'Directory to save model/log/metrics.')
 flags.DEFINE_integer('port', 33336, 'Port to show visualization results.')
 flags.DEFINE_bool('test', False, 'only test.')
+flags.DEFINE_string('test_ckpt', '', 'Checkpoint .pth path for test-only mode.')
 
 def main(argv):
 
@@ -74,7 +75,7 @@ def main(argv):
     vm.show_basic_info(flags_obj)
     trainer = utils.ContextManager.set_trainer(flags_obj, cm, vm, dm)
     if flags_obj.test:
-        trainer.test(path='XXXX')
+        trainer.test(path=flags_obj.test_ckpt or None)
 
     else:
         trainer.train()
