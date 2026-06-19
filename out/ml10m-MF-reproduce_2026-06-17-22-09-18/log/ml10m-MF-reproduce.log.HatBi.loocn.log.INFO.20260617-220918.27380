@@ -1,0 +1,67 @@
+I0617 22:09:18.336088 25744 utils.py:104] FLAGS:
+I0617 22:09:18.336377 25744 utils.py:106] logtostderr: False
+I0617 22:09:18.336498 25744 utils.py:106] alsologtostderr: False
+I0617 22:09:18.336564 25744 utils.py:106] log_dir: 
+I0617 22:09:18.336609 25744 utils.py:106] v: 0
+I0617 22:09:18.336645 25744 utils.py:106] verbosity: 0
+I0617 22:09:18.336704 25744 utils.py:106] logger_levels: {}
+I0617 22:09:18.336766 25744 utils.py:106] stderrthreshold: fatal
+I0617 22:09:18.336796 25744 utils.py:106] showprefixforinfo: True
+I0617 22:09:18.336939 25744 utils.py:106] run_with_pdb: False
+I0617 22:09:18.336993 25744 utils.py:106] pdb_post_mortem: False
+I0617 22:09:18.337020 25744 utils.py:106] pdb: False
+I0617 22:09:18.337044 25744 utils.py:106] run_with_profiling: False
+I0617 22:09:18.337064 25744 utils.py:106] profile_file: None
+I0617 22:09:18.337082 25744 utils.py:106] use_cprofile_for_profiling: True
+I0617 22:09:18.337097 25744 utils.py:106] only_check_args: False
+I0617 22:09:18.337113 25744 utils.py:106] name: ml10m-MF-reproduce
+I0617 22:09:18.337129 25744 utils.py:106] model: MF
+I0617 22:09:18.337146 25744 utils.py:106] num_layers: 2
+I0617 22:09:18.337164 25744 utils.py:106] dropout: 0.2
+I0617 22:09:18.337180 25744 utils.py:106] margin: 40
+I0617 22:09:18.337195 25744 utils.py:106] pool: 40
+I0617 22:09:18.337210 25744 utils.py:106] adaptive: False
+I0617 22:09:18.337225 25744 utils.py:106] margin_decay: 0.9
+I0617 22:09:18.337240 25744 utils.py:106] loss_decay: 0.9
+I0617 22:09:18.337255 25744 utils.py:106] weighting_mode: nc
+I0617 22:09:18.337270 25744 utils.py:106] weighting_smoothness: 1.0
+I0617 22:09:18.337289 25744 utils.py:106] use_gpu: False
+I0617 22:09:18.337306 25744 utils.py:106] gpu_id: 1
+I0617 22:09:18.337321 25744 utils.py:106] cg_use_gpu: False
+I0617 22:09:18.337336 25744 utils.py:106] cg_gpu_id: 1
+I0617 22:09:18.337357 25744 utils.py:106] dataset: ml10m
+I0617 22:09:18.337376 25744 utils.py:106] embedding_size: 128
+I0617 22:09:18.337391 25744 utils.py:106] epochs: 1
+I0617 22:09:18.337407 25744 utils.py:106] lr: 0.01
+I0617 22:09:18.337422 25744 utils.py:106] min_lr: 0.0001
+I0617 22:09:18.337439 25744 utils.py:106] weight_decay: 5e-08
+I0617 22:09:18.337453 25744 utils.py:106] batch_size: 128
+I0617 22:09:18.337467 25744 utils.py:106] dis_loss: dcor
+I0617 22:09:18.337482 25744 utils.py:106] dis_pen: 0.01
+I0617 22:09:18.337497 25744 utils.py:106] int_weight: 0.1
+I0617 22:09:18.337512 25744 utils.py:106] pop_weight: 0.1
+I0617 22:09:18.337526 25744 utils.py:106] neg_sample_rate: 4
+I0617 22:09:18.337540 25744 utils.py:106] shuffle: True
+I0617 22:09:18.337557 25744 utils.py:106] metrics: ['recall', 'hit_ratio', 'ndcg']
+I0617 22:09:18.337574 25744 utils.py:106] val_metrics: ['recall', 'hit_ratio', 'ndcg']
+I0617 22:09:18.337590 25744 utils.py:106] watch_metric: recall
+I0617 22:09:18.337606 25744 utils.py:106] patience: 5
+I0617 22:09:18.337620 25744 utils.py:106] es_patience: 3
+I0617 22:09:18.337635 25744 utils.py:106] num_val_users: 1000000
+I0617 22:09:18.337650 25744 utils.py:106] num_test_users: 1000000
+I0617 22:09:18.337664 25744 utils.py:106] test_model: best
+I0617 22:09:18.337680 25744 utils.py:106] topk: [5, 10, 20, 30, 40, 50]
+I0617 22:09:18.337695 25744 utils.py:106] num_workers: 2
+I0617 22:09:18.337712 25744 utils.py:106] load_path: data/ml10m/output/
+I0617 22:09:18.337727 25744 utils.py:106] workspace: ./
+I0617 22:09:18.337742 25744 utils.py:106] output: ./out/
+I0617 22:09:18.337758 25744 utils.py:106] port: 33336
+I0617 22:09:18.337775 25744 utils.py:106] test: False
+I0617 22:09:18.337790 25744 utils.py:106] test_ckpt: 
+I0617 22:09:18.337804 25744 utils.py:106] ?: False
+I0617 22:09:18.337818 25744 utils.py:106] help: False
+I0617 22:09:18.337833 25744 utils.py:106] helpshort: False
+I0617 22:09:18.337847 25744 utils.py:106] helpfull: False
+I0617 22:09:18.337861 25744 utils.py:106] helpxml: False
+I0617 22:09:21.095782 25744 trainer.py:148] learning rate : 0.01
+I0617 22:10:21.540764 25744 trainer.py:167] epoch 0: running loss = 0.3517937634289265

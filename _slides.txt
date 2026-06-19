@@ -1,0 +1,237 @@
+========== SLIDE 1 ==========
+IDCIV-RS KHỬ THIÊN LỆCH NHÂN QUẢ TRONG HỆ THỐNG KHUYẾN NGHỊ
+GVHD: TS. 
+Bùi Tiến Lên
+HVTH: Phạm Thị Chiều - 24C12003
+HVTH: Lê Hoàng Nhân - 24C11044
+HVTH: Dương Tiến Vinh - 24C11034
+‹#›
+
+========== SLIDE 2 ==========
+Nội dung
+Vấn đề
+Giải pháp
+Phương pháp 
+IDCIV-RS
+Dữ liệu
+Thực nghiệm
+Kết quả
+Kết luận
+Demo
+© Bộ môn 
+PTDLTM
+ - Khoa CNTT - Trường ĐH KHTN
+‹#›
+
+========== SLIDE 3 ==========
+© Bộ môn 
+PTDLTM
+ - Khoa CNTT - Trường ĐH KHTN
+Vấn đề
+‹#›
+Thiên lệch trong hệ thống khuyến nghị
+Thiên lệch do các biến nhiễu ẩn
+Hệ thống khuyến nghị trên thực tế luôn đối mặt với các biến nhiễu không quan sát được: hành vi click của người dùng không chỉ phụ thuộc vào sở thích thực sự mà còn bị ảnh hưởng bởi các biến nhiễu ẩn như hiệu ứng đám đông, độ phủ sóng quảng cáo hay tâm lý tạm thời
+
+========== SLIDE 4 ==========
+© Bộ môn 
+PTDLTM
+ - Khoa CNTT - Trường ĐH KHTN
+Vấn đề
+‹#›
+Rào cản của phương pháp cũ
+Hậu quả là mô hình ngộ nhận nhu cầu tự nhiên của khách hàng, gây lãng phí tài nguyên hiển thị và sai lệch kết quả dự báo.
+
+========== SLIDE 5 ==========
+© Bộ môn 
+PTDLTM
+ - Khoa CNTT - Trường ĐH KHTN
+2. Giải pháp
+‹#›
+Inverse Propensity Scoring (IPS):
+ Trọng số hóa dữ liệu để bù đắp cho sự thiên lệch vị trí hiển thị.
+Causal Inference:
+ Sử dụng suy luận nhân quả để tách biệt sở thích thực sự khỏi biến nhiễu.
+Adversarial Training:
+ Huấn luyện đối kháng giúp mô hình học cách không phụ thuộc vào độ phổ biến ảo.
+
+========== SLIDE 6 ==========
+© Bộ môn 
+PTDLTM
+ - Khoa CNTT - Trường ĐH KHTN
+2. Giải pháp
+‹#›
+
+========== SLIDE 7 ==========
+© Bộ môn 
+PTDLTM
+ - Khoa CNTT - Trường ĐH KHTN
+3.
+ Ph
+ương pháp 
+IDCIV - RS 
+‹#›
+3.1 Quy trình ba bước của IDCIV - RS
+
+========== SLIDE 8 ==========
+3. Phương pháp IDCIV - RS 
+‹#›
+3.2 Sơ đồ nhân quả
+Ý nghĩa của các biến trong sơ đồ
+W (Treatment - Biến can thiệp):
+ Trong hệ thống khuyến nghị, đây là việc hiển thị một sản phẩm hoặc nội dung nào đó cho người dùng (Ad Exposure / Item Recommendation).
+Y (Outcome - Biến kết quả):
+ Phản hồi hoặc hành vi của người dùng sau khi thấy nội dung, ví dụ như hành vi nhấp chuột (Click), lượt xem (View) hoặc lượt mua.
+Uc (Latent Confounders - Biến nhiễu ẩn):
+ Các yếu tố không quan sát được và không thể đo lường trực tiếp (như tâm trạng nhất thời của người dùng, các xu hướng ảo, hiệu ứng đám đông). Nó tác động đồng thời lên cả việc hiển thị sản phẩm W lẫn hành vi nhấp chuột Y (thể hiện qua hai đường mũi tên nét đứt hướng từ Uc sang W và Y).
+
+========== SLIDE 9 ==========
+3. Phương pháp IDCIV - RS 
+‹#›
+3.2 Sơ đồ nhân quả
+Ý nghĩa của các biến trong sơ đồ
+X
+ (Measured Pretreatment Variables):
+ Khung nét đứt bao quanh tập hợp các biến đặc trưng quan sát được trước khi có hành vi can thiệp xảy ra (ví dụ: lịch sử tương tác cũ, hồ sơ người dùng).
+Zt, Zc
+ (Biểu diễn được học từ X):
+ Hai thành phần cốt lõi mà mô hình IDCIV-RS tự động trích xuất nhằm giải quyết bài toán nhân quả.
+Zt:  Biến công cụ có điều kiện (Conditional Instrumental Variable - CIV).
+Zc:: Tập điều kiện kiểm soát (Conditioning Set).
+
+========== SLIDE 10 ==========
+3. Phương pháp IDCIV - RS 
+‹#›
+3.2 Sơ đồ nhân quả
+Cơ chế chặn đường truyền Backdoor bằng Biến công cụ có điều kiện (CIV):
+Zt (Conditional IV):
+ Biến công cụ có điều kiện học từ dữ liệu tương tác thực tế X.
+Zc (Conditioning Set):
+ Tập điều kiện đi kèm giúp chặn các liên kết không hợp lệ.
+Chặn backdoor hoàn hảo:
+ Khi kiểm soát dựa trên tập điều kiện Zc, mọi đường truyền backdoor phi nhân quả từ Zt đến click Y đều bị chặn hoàn toàn, cô lập tác động thuần túy của hiển thị quảng cáo W.
+
+========== SLIDE 11 ==========
+3. Phương pháp IDCIV - RS 
+‹#›
+3.
+2
+ Sơ đồ nhân quả
+Phân tích cơ chế hoạt động nhân quả (Tại sao mô hình loại bỏ được thiên lệch?)
+Vấn đề của đường truyền sai số (Backdoor Path):
+ Sự tồn tại của nhiễu ẩn $U_c$ tạo ra một đường truyền phi nhân quả (backdoor path): $W \leftarrow U_c \rightarrow Y$. Đường truyền này khiến cho các mô hình Machine Learning truyền thống bị ngộ nhận rằng người dùng click vì thích sản phẩm ($W \rightarrow Y$), trong khi thực tế họ click vì bị tác động bởi nhiễu $U_c$.
+Rào cản từ mối quan hệ giữa $U_c$ và dữ liệu:
+Trong sơ đồ, đường nét đứt cong từ $U_c$ hướng đến $Z_c$ thể hiện rằng nhiễu tiềm ẩn vẫn có mối liên hệ mật thiết và làm ảnh hưởng đến dữ liệu đầu vào. Do đó, ta không thể tìm thấy một biến công cụ thuần túy hoàn toàn độc lập với nhiễu ẩn nếu chỉ lấy trực tiếp từ hệ thống.
+
+========== SLIDE 12 ==========
+3. Phương pháp IDCIV - RS 
+‹#›
+3.2 Sơ đồ nhân quả
+Phân tích cơ chế hoạt động nhân quả (Tại sao mô hình loại bỏ được thiên lệch?)
+Giải pháp của IDCIV-RS thông qua cơ chế Điều kiện hóa (Conditioning):
+ Mô hình tiến hành tách dữ liệu $X$ thành hai phần có vai trò khác nhau:
+$Z_c$ gánh chịu và hấp thụ tác động của nhiễu:
+ Mũi tên từ $Z_c \rightarrow W$ và $Z_c \rightarrow Y$ cho thấy $Z_c$ đóng vai trò như một biến kiểm soát cấu trúc nhiễu. Khi mô hình thực hiện 
+điều kiện hóa dựa trên $Z_c$ (conditioning on $Z_c$)
+, đường truyền ảnh hưởng từ nhiễu ẩn $U_c$ sang hệ thống sẽ bị chặn đứng (block).
+$Z_t$ trở thành Biến công cụ sạch (Valid CIV):
+ Sau khi $Z_c$ đã khóa đường truyền của nhiễu, biến $Z_t$ (với mũi tên chỉ vào $W$ và có mối liên hệ gián tiếp thông qua $Z_c$) sẽ trở thành một Biến công cụ có điều kiện hoàn toàn hợp lệ. $Z_t$ lúc này chỉ tác động đến kết quả $Y$ duy nhất thông qua một con đường: đi qua biến can thiệp $W$ ($Z_t \rightarrow W \rightarrow Y$).
+Kết luận:
+ Nhờ việc chia tách và ép dữ liệu tuân theo cấu trúc DAG này, mô hình IDCIV-RS có thể cô lập và đo lường chính xác tác động nhân quả thuần túy $W \rightarrow Y$, loại bỏ hoàn toàn các tương quan giả do nhiễu ẩn $U_c$ gây ra mà không cần bổ sung bất kỳ nguồn dữ liệu ngoại sinh nào từ bên ngoài.
+
+========== SLIDE 13 ==========
+4
+. Dữ l
+iệu
+‹#›
+Thực nghiệm được thực hiện diện rộng trên hai bộ dữ liệu benchmark thực tế quy mô lớn:
+MovieLens-10M:
+ Đánh giá khả năng dự đoán sở thích điện ảnh đại chúng.
+Douban-Movie:
+ Bộ dữ liệu chứa mức độ thưa thớt cực hạn lên đến 
+99.64%
+.
+
+========== SLIDE 14 ==========
+© Bộ môn 
+PTDLTM
+ - Khoa CNTT - Trường ĐH KHTN
+5
+. Th
+ực
+ ngh
+iệm
+‹#›
+Nghiên cứu tiến hành thực nghiệm diện rộng để chứng minh tính vững chãi của mô hình:
+Hai bộ dữ liệu thực tế quy mô lớn (Real-world Datasets):
+MovieLens-10M:
+ Thử nghiệm trên $10,000,054$ tương tác từ $69,878$ người dùng và $10,677$ phim. Độ thưa thớt (Sparsity): $98.66\%$.
+Douban-Movie:
+ Gồm $6,211,452$ tương tác từ $50,000$ người dùng và $34,893$ phim. Độ thưa thớt cực đoan: $99.64\%$.
+Các mô hình nền tảng đối chứng (Baselines):
+ So sánh trực tiếp với các nhóm thuật toán SOTA hiện nay bao gồm: Nhóm truyền thống (MF, BPR), nhóm gán trọng số (IPS, CausE), và các phương pháp tiếp cận Biến công cụ thế hệ trước (như IV4Rec).
+Chỉ số đánh giá (Metrics):
+ Sử dụng các thang đo tiêu chuẩn hiệu năng hệ thống RS là 
+Recall@K
+ và 
+NDCG@K
+ (với $K \in \{5, 10, 20\}$)
+
+========== SLIDE 15 ==========
+© Bộ môn 
+PTDLTM
+ - Khoa CNTT - Trường ĐH KHTN
+6
+. K
+ết quả
+‹#›
+
+========== SLIDE 16 ==========
+© Bộ môn 
+PTDLTM
+ - Khoa CNTT - Trường ĐH KHTN
+6. Kết quả
+‹#›
+
+========== SLIDE 17 ==========
+© Bộ môn 
+PTDLTM
+ - Khoa CNTT - Trường ĐH KHTN
+7
+. K
+ết luận
+‹#›
+Giải pháp tiên phong xuất sắc:
+ Lần đầu tiên phát triển cơ chế tự sinh và học biểu diễn Biến công cụ có điều kiện (CIV) trực tiếp từ dữ liệu tương tác lịch sử.
+Cơ sở toán học vững chắc:
+ Chứng minh thành công tính nhất quán nhân quả về mặt lý thuyết giúp việc khử bias đạt được sự ổn định tuyệt đối.
+SOTA đột phá:
+ Thiết lập kỷ lục mới về độ đa dạng và độ chính xác (NDCG, Recall) trên các tập dữ liệu chuẩn so với các mô hình khử bias truyền thống.
+Khả năng ứng dụng thực tế:
+ Mở đường tích hợp hiệu quả Suy luận nhân quả sâu (Deep Causal Inference) trực tiếp vào các hệ thống AI sản xuất quy mô lớn.
+
+========== SLIDE 18 ==========
+© Bộ môn 
+PTDLTM
+ - Khoa CNTT - Trường ĐH KHTN
+8
+. Demo
+‹#›
+https://717ba95d3def656484.gradio.live/
+
+========== SLIDE 19 ==========
+© Bộ môn 
+PTDLTM
+ - Khoa CNTT - Trường ĐH KHTN
+Tài liệu tham khảo
+‹#›
+https://arxiv.org/pdf/2408.09651
+
+========== SLIDE 20 ==========
+© Bộ môn 
+PTDLTM
+ - Khoa CNTT - Trường ĐH KHTN
+CẢM ƠN THẦY VÀ 
+CÁC BẠN ĐÃ 
+LẮNG NGHE!
+‹#›

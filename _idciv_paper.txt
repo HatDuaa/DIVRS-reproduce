@@ -1,0 +1,1039 @@
+
+========== PAGE 1 ==========
+Interaction-Data-guided Conditional Instrumental Variables for Debiasing
+Recommender Systems
+Zhirong Huang1,2 , Debo Cheng*3,4 , Lin Liu4 , Jiuyong Li4 , Guangquan Lu1,2 and Shichao
+Zhang*1,2
+1Key Lab of Education Blockchain and Intelligent Technology , Ministry of Education, Guangxi Normal
+University, Guilin, 541004, China
+2Guangxi Key Lab of Multi-Source Information Mining and Secu rity, Guangxi Normal University,
+Guilin, 541004, China
+3School of Computer Science and Technology, Hainan Universi ty, Haikou, Hainan, 570228, China
+4UniSA STEM, University of South Australia, Mawson Lakes, Ad elaide, Australia
+huangzr@stu.gxnu.edu.cn, chengdb2016@gmail.com,
+{zhangsc,lugq}@mailbox.gxnu.edu.cn,{Lin.Liu, Jiuyong.Li}@unisa.edu.au
+Abstract
+It is often challenging to identify a valid instru-
+mental variable (IV), although the IV methods have
+been regarded as effective tools of addressing the
+confounding bias introduced by latent variables.
+To deal with this issue, an Interaction-Data-guided
+Conditional IV (IDCIV) debiasing method is pro-
+posed for Recommender Systems, called IDCIV -
+RS. The IDCIV -RS automatically generates the
+representations of valid CIVs and their correspond-
+ing conditioning sets directly from interaction data,
+signiﬁcantly reducing the complexity of IV selec-
+tion while effectively mitigating the confounding
+bias caused by latent variables in recommender sys-
+tems. Speciﬁcally, the IDCIV -RS leverages a vari-
+ational autoencoder (V AE) to learn both the CIV
+representations and their conditioning sets from
+interaction data, followed by the application of
+least squares to derive causal representations for
+click prediction. Extensive experiments on two
+real-world datasets, Movielens-10M and Douban-
+Movie, demonstrate that IDCIV -RS successfully
+learns the representations of valid CIVs, effectively
+reduces bias, and consequently improves recom-
+mendation accuracy.
+1 Introduction
+With the rapid development of the Internet, the amount
+of information has exploded, making it increasingly difﬁ-
+cult for users to sift through vast amounts of data to ﬁnd
+content that aligns with their preferences [Luo et al., 2025;
+Gao et al., 2021; Zhang, 2021 ]. Recommender systems have
+emerged as a critical solution to this problem by analysing
+user behaviour data to deliver personalised recommenda-
+tions, thereby enhancing user engagement and satisfac-
+∗ Corresponding author
+U
+Y
+I
+(a)
+U Y
+I
+Ci
+(b)
+W Y
+Z C
+(c)
+Figure 1: Three causal graphs illustrate the assumptions un derlying
+existing work. The variables are deﬁned as follows: U : user prefer-
+ences, I: displayed items, Y : user feedback or outcome variables,
+Ci: confounding factors affecting items, C: confounding factors, Z:
+instrumental variables, W : treatment variables (i.e., embeddings of
+user-item pairs). (a) The causal graph represents the tradi tional rec-
+ommendation model; (b) the causal graph represents the debi asing
+method using causality; (c) the causal graph representatio n of the
+debiasing method using standard IV .
+tion [Wang et al., 2020]. Recommender systems have be-
+come an integral part of many digital platforms, ﬁnd-
+ing extensive applications across various domains, includ -
+ing e-commerce [Shoja and Tabrizi, 2019], streaming me-
+dia [Gomez-Uribe and Hunt, 2015 ], and social networks
+[Liao et al., 2022], signiﬁcantly improving information re-
+trieval efﬁciency and user experience.
+The performance of recommendation systems is often af-
+fected by latent confounders that are neither directly obse rv-
+able nor reﬂected in historical user-item interactions. Fo r in-
+stance, factors such as social inﬂuence or peer preferences
+can signiﬁcantly shape user behavior but are rarely capture d
+in logged data. This misalignment may cause to recommen-
+dation systems misinterpret user intent, ultimately degra ding
+recommendation quality. Effectively addressing latent co n-
+founders is thus vital for enhancing both the accuracy and
+robustness of recommender systems.
+User behaviour data is crucial for recommender systems
+in predicting user preferences. Existing models often as-
+sume this data is unbiased and accurately reﬂects user pref-
+erences, meaning the data accurately reﬂects user prefer-
+ences [Lan et al., 2024]. Based on this assumption, many
+arXiv:2408.09651v2  [cs.IR]  25 Aug 2025
+
+========== PAGE 2 ==========
+methods have been proposed, such as Matrix Factorisation
+(MF) [Koren et al., 2009] and Neural Network-based Col-
+laborative Filtering (NCF) [He et al., 2017]. These methods
+achieve the goal of predicting user preferences by ﬁtting us er
+behaviour data, as depicted in the causal Directed Acyclic
+Graph (DAG) [Pearl, 2009; Cheng et al., 2022] shown in Fig-
+ure 1 (a), which illustrates the causal relationships betwe en
+user preferences (U ) and user feedback (Y ), as well as be-
+tween displayed items (I) and Y . However, in the real-world,
+user behaviour is inevitably inﬂuenced by various unobserv -
+able confounding factors, such as item popularity (e.g., fr e-
+quent recommendation of an item limits users’ choices) and
+user psychology (e.g., choosing to watch a movie for social-
+ising) [Chen et al., 2023]. These factors introduce biases like
+popularity and conformity bias, leading models to learn fal se
+correlations and reducing their ability to accurately pred ict
+preferences.
+Causal inference [Zhang et al., 2024; Li et al., 2024] has
+been applied to reduce bias in recommender systems by
+designing causal DAGs to model data generation, iden-
+tify biases, and guide model design [Wang et al., 2020;
+Gao et al., 2024]. For instance, Zhang et
+al. [Zhang et al., 2021] introduced a causal graph to analyse
+item popularity’s impact and proposed the PDA training
+paradigm to correct popularity bias. Similarly, Zheng et
+al. [Zheng et al., 2021] addressed conformity bias with the
+DICE model, disentangling user interest from conformity.
+However, these methods rely on the assumption that the
+real data follows the designed causal graphs, which may
+not hold in practice [Cai et al., 2024]. Complex real-world
+confounding makes such assumptions difﬁcult to satisfy,
+potentially limiting the models’ effectiveness.
+Latent confounders, which are unobserved variables that
+simultaneously affect both the treatment (e.g., recommen-
+dation process) and the outcomes, present signiﬁcant chal-
+lenges for debiasing recommender systems. Instrumen-
+tal V ariables (IVs) are a common solution to this is-
+sue [Caner and Hansen, 2004; Pearl, 2009 ], with a valid
+IV (e.g., Z in Figure 1(c)) satisfying three key crite-
+ria [Pearl, 2009]: (i) relevance to the treatment variable; (ii)
+an exclusive impact on the outcome through the treatment;
+and (iii) no shared confounders with the outcome. Sev-
+eral IV -based methods have been proposed for recommenda-
+tion settings to reduce latent bias without relying on stric t
+causal graph assumptions [Si et al., 2022; Si et al., 2023a;
+Si et al., 2023b]. For example, IV4Rec [Si et al., 2022] lever-
+ages self-collected search data as an IV to effectively addr ess
+latent confounding. However, verifying the latter two IV con-
+ditions from observational data alone is practically infea si-
+ble [Brito and Pearl, 2012; Cheng et al., 2023b], making the
+identiﬁcation of valid IVs particularly challenging.
+In causal inference, researchers have used condi-
+tional IVs (CIVs) to tackle the limitations of standard
+IVs [Pearl, 2009; Brito and Pearl, 2012; Cheng et al., 2024a;
+Cheng et al., 2023a]. CIVs offer more relaxed ap-
+plication conditions than standard IVs. Recently,
+Cheng et al. [Cheng et al., 2023b] developed a CIV
+method (CIV .V AE) based on the variational autoencoder
+(V AE) [Kingma and Welling, 2013; Sch¨ olkopf et al., 2021;
+Zt Zc
+W Y
+Uc 
+X
+Figure 2: A causal DAG illustrating our proposed IDCIV-RS method
+for discovering CIVs and their conditional sets from observ ational
+data. W , Y , X, and Uc are the treatment, outcome, set of measured
+pretreatment variables, and latent confounders between W and Y ,
+respectively. Zt and Zc denote the representations of the CIVs and
+their conditional sets learned from X.
+Sch¨ olkopf, 2022] model, which generates CIVs and their
+conditional sets from data, signiﬁcantly relaxing the con-
+straints of standard IVs. However, this method is designed
+for tabular data, and no attempt has been made to adapt it to
+interactive data in recommender systems.
+To address the challenge of using CIV in interactive data,
+we ﬁrst propose a causal DAG, as shown in Figure 2, to rep-
+resent the causal relationships between observed and laten t
+variables in interaction data within recommender systems.
+Building on this causal DAG, we develop an interaction-data-
+guided conditional IV (IDCIV) debiasing method for recom-
+mender systems, called IDCIV -RS. Speciﬁcally, IDCIV -RS
+uses the embeddings of user-item pairs (including users wit h
+the selected items, i.e., positive samples, and users with t heir
+pre-selected items, i.e., negative samples) as the treatme nt
+variable W , the user feedback as the outcome Y , and the
+user interaction data (only positive samples) as the pretre at-
+ment variable X. We assume that at least one CIV exists
+within X, capturing latent information such as user search
+behaviours that lead to interactions. The assumption is rea -
+sonable because in real-world scenarios, users are often in ﬂu-
+enced by certain external factors that cause their interact ions
+to be not fully consistent with their true preferences. For e x-
+ample, users may interact with items because of certain ex-
+ternal incentives (e.g., search recommendations, promoti ons,
+etc.) even though these items do not exactly match their true
+preferences. IDCIV -RS employs a V AE to generate the repre-
+sentations of the CIV and its conditional set from X, denoted
+as Zt and Zc, as shown in Figure 2. The contribution of our
+work is summarised below:
+• We propose a novel causal DAG to represent the causal
+relationships between observed and latent variables in
+interaction data within recommender systems.
+• We develop an interaction-data-guided conditional IV
+(IDCIV) debiasing method for recommender systems,
+called IDCIV -RS, for learning representations of CIVs
+and its conditional sets under the proposed causal DAG.
+To the best of our knowledge, this is the ﬁrst work to
+generate representations of CIVs and their conditional
+sets from interaction data for mitigating bias in recom-
+mender systems.
+• Extensive experiments on two real-world datasets
+demonstrate that IDCIV -RS achieves optimal debiasing
+results and recommendation performance compared to
+
+========== PAGE 3 ==========
+state-of-the-art causal debiasing methods.
+2 Related Work
+In this section, we review the recommender methods most
+closely related to our IDCIV -RS, including traditional recom-
+mender methods and causal recommender methods.
+2.1 Traditional Recommender Methods
+Traditional recommender methods, primarily based on Col-
+laborative Filtering (CF), typically assume that user be-
+haviour data is unbiased [Koren et al., 2021]. The main-
+stream approach is model-based CF, which trains a model on
+user behaviour data to recommend items that align with user
+preferences. A classic method is MF [Koren et al., 2009],
+which decomposes the user-item rating matrix to predict pref-
+erences. However, MF assumes that unselected items are in-
+compatible with user preferences, ignoring cases where use rs
+may not have encountered those items. To address this, Ren-
+dle et al. [Rendle et al., 2012] proposed Bayesian Personal-
+ized Ranking (BPR), which assumes users prefer selected
+items over unselected ones, enhancing preference inferenc e
+in MF.
+With the rise of deep learning [Luo et al., 2024;
+Zhang et al., 2022], He et al. [He et al., 2017] proposed
+NCF, which uses multi-layer perceptrons (MLPs) to model
+non-linear user preferences. To capture richer behavioura l
+signals, Wang et al. [Wang et al., 2019] introduced Neural
+Graph Collaborative Filtering (NGCF), leveraging Graph
+Convolutional Networks (GCNs) to embed user-item interac-
+tions. He et al. [He et al., 2020] further simpliﬁed this with
+LightGCN, improving both efﬁciency and accuracy. How-
+ever, these methods often overlook popularity bias, which
+can be ampliﬁed during training and skew recommendations
+toward popular items.
+2.2 Causal Recommender Methods
+To mitigate biases in recommender systems, researchers
+have increasingly adopted causal inference tech-
+niques. Early approaches used the Inverse Propensity
+Score (IPS) [Wang et al., 2021; Schnabel et al., 2016;
+Bottou et al., 2013] to reduce bias by assigning an inverse
+propensity score (e.g., the inverse of item popularity) to
+user-item interactions during training, balancing the in-
+ﬂuence of popular and less popular items. However, IPS
+methods often suffer from high variance and instability.
+Building on IPS success, researchers have explored causal
+graph-based methods [Zheng et al., 2021; He et al., 2023;
+Zhang et al., 2021] that model the generation mechanisms
+of user behaviour. These methods design speciﬁc models
+to address biases like popularity and conformity bias.
+Y et, the presence of unobserved confounders in real-
+world data limits the effectiveness of these causal graph
+assumptions [Cai et al., 2024].
+IVs are commonly used in causal inference to address con-
+founding. Recently, methods leveraging user search data
+as IVs have emerged, with the IV4Rec framework by Si et
+al. [Si et al., 2022] being a notable example. IV4Rec uses
+user search data to decompose user-item representations in to
+causal and non-causal components, addressing some limita-
+tions of causal graph-based methods and reducing bias. How-
+ever, identifying valid user search data as IVs remains chal -
+lenging. Unlike these approaches, our work focuses on learn -
+ing the representations of CIVs and their conditional sets,
+which are less restrictive than standard IVs.
+3 The Proposed IDCIV-RS Method
+In this section, we ﬁrst introduce the problem deﬁnition, th en
+explain the feasibility and rationality of our method by the
+causal graph, and then introduce the four main steps of our
+method. The overall workﬂow of our proposed IDCIV -RS is
+visualised in Figure 3.
+3.1 Problem Deﬁnition
+In the recommender system, user behaviour data D usually
+consists of a user set U and an item set I. D contains two
+parts, namely: user u and selected items p to form positive
+sample pairs, and user u and pre-selected items n to form
+negative sample pairs. The user interaction data X consists of
+positive sample pairs derived from D. X implicitly contains
+a wealth of information, including user interactions stemming
+from search behaviours.
+In recommendation models, users and items are usually
+represented as low-dimensional embedding representation s
+W , and the corresponding user-item pairs can be represented
+as W ={(wu, w i)|u ∈ U, i ∈ I}. However, in addition
+to reﬂecting user preferences, user behaviour data D contains
+spurious correlations caused by various latent confoundin g
+factors Uc (e.g., item exposure, conformity inﬂuence). Al-
+though existing methods have mitigated the impact of these
+confounding factors to some extent through causal inferenc e
+techniques, they often come with strong assumptions. We
+aim to address this challenging problem in our work, and our
+problem deﬁnition is described as follows.
+Deﬁnition 1. In a recommender system, the latent variables
+Uc affect the choice made and introduce bias. W e assume that
+at least one CIV exists within X, capturing latent information
+that leads to interactions. The causal relationships betwe en
+measured and latent variables are shown in Figure 2. Our
+goal is to learn the representations of the CIV Zt and its con-
+ditional set Zc from the user interaction data X to address
+the confounding biases introduced by Uc.
+3.2 The Proposed Causal DAG
+In this work, we proposed a causal DAG G as shown in Fig-
+ure 2 to represent the causal relationships between the mea-
+sured and latent variables. LetGW
+be the manipulated graph,
+obtained by deleting all arrows emerging from nodes in W
+withinG. In GW , Zt and W are d-connected when con-
+ditioned on Zc because of the existence of the edge Zt →
+W . However, Zt and Y are d-separated by Zc since Zt,
+Zc and Uc form a collider at W , and Zc blocks the path
+Zt← Zc→ Y . Furthermore, the effect of Zt on Y is medi-
+ated solely by W through the causal path Zt→ W → Y .
+Therefore, Zt is a CIV , and Zc is its corresponding con-
+ditional set. Note that Zc may contain information about
+
+========== PAGE 4 ==========
+Recommender system backbone 
+Regression 
+T T
+X ZC
+Y Y
+p(Z t|X) 
+p(Z c|X) 
+Lclick 
+Wu,i 
+Learning the representations 
+of CIV and its condition set 
+D
+Lciv 
+Ltotal 
+Positive 
+sample 
+Negative 
+sample n
+CSEM 
+· · · · · · 
+· · · · · · 
+u1
+i5
+pp
+uu
+u
+p
+u
+p
+u
+p
+u
+p
+u2
+u3
+u4
+u5
+i4
+i3
+i2
+i1
+u1
+u2
+u3 i3
+i2
+i1
+uuser 
+item of positive sample 
+item of negative sample 
+i2item 
+Wu,i 
+re 
+Wu,i 
+re 
+uu
+pp
+embedding of user 
+weighted sum 
+inner product 
+nn
+
+Wu,i 
+
+Wu,i 
+1
+2
+3 3 4
+Figure 3: The overall structure of IDCIV-RS consists of four main steps, labelled 1, 2, 3, and 4 in the diagram. First, duri ng feature encoding,
+IDCIV-RS uses a backbone (MF or LightGCN) to encode the input data into a latent space representation. Second, the CSEM mo dule is used
+to learn the CIV Zt and its condition set Zc from the user-item interaction data X. Third, the representation of CIV is used to decompose the
+treatment variable Wu,i, obtain the causal relationship representation ˆWu,i, and fuse it with the conditional set representation Zc to get the
+reconstructed treatment variable W re
+u,i. Finally, W re
+u,i is used for the click prediction.
+latent factors Uc due to the complex relationships in in-
+teractive data, as indicated by the dashed line between Uc
+and Zc [Wu et al., 2022; Cheng et al., 2024b]. Many existing
+works have shown that confounding factors can affect recom-
+mendation outcomes, speciﬁcally Zc → Y [Si et al., 2022;
+Si et al., 2023a; Si et al., 2023b]. Furthermore, since Zt and
+Zc are derived from the user interaction data X, they will af-
+fect W , i.e., Zt→ W and Zc→ W inG.
+Based on the proposed causal DAG, we present IDCIV -
+RS, an interaction-data-guided CIV debiasing method for rec-
+ommender systems. IDCIV -RS offers two key advantages
+over existing approaches: it eliminates the need for domain -
+speciﬁc IV speciﬁcation and leverages CIVs, which provide
+a more general framework for mitigating confounding bias
+from latent factors.
+3.3 The Concepts of Treatment Variable, CIV and
+Its Conditional Set
+We deﬁne the concepts for the treatment variable, the CIV ,
+and its conditional set based on user behaviour data. The
+treatment variable Wu,i using user-item pairs is deﬁned as:
+Wu,i ={(wu, w i)|u∈ U, i ∈ I}, (1)
+where wu and wi represent the embeddings of user u and item
+i, respectively. The concepts for the representations of CIV
+Zt and its conditional set Zc from the user interaction data X
+are as follows:
+Zt ={
+(
+ztu, z tp
+)
+|u, p ∈ X}, (2)
+Zc ={
+(
+zcu, z cp
+)
+|u, p ∈ X}, (3)
+where ztu and zcu indicate the representations of the CIV of
+the user u and its conditional set, respectively, ztp and zcp
+denote the representations of CIV of the corresponding item
+p and its conditional set, respectively. To estimate the caus al
+effects of users and items on Y (user feedback), it is necessary
+to construct the CIV and its conditional set for the user u and
+item p, respectively.
+3.4 Learning the Representations of CIV and Its
+Condition Set
+X
+q(Zt|X )
+q(Zc|X )
+p(Zt)
+p(Zc)
+p(X|Z t,Z c)
+ĊĊ 
+ĊĊ 
+Inference Network Generative Network 
+Ċ
+Figure 4: The CSEM components used to learn the latent repres en-
+tation of CIV Zt and its conditional set Zc consist of an inference
+network and a generation network. The grey boxes represent s am-
+ples drawn from the corresponding distribution, and the whi te boxes
+represent the neural network.
+In our IDCIV -RS framework, we employ a V AE
+structure as the generative model to generate the rep-
+resentations of the CIV Zt and its conditional set
+Zc [Kingma and Welling, 2013; Sohn et al., 2015] from the
+user interaction data X, referred to as the CIV and condi-
+tional Set Extraction Module (CSEM), as shown in Figure 4.
+We use the inference and generation networks of V AE to ap-
+proximate the posterior distributions p (Zt|X) and p (Zc|X)
+for the two representations Zt and Zc.
+In the inference network, we use two independent encoders
+to learn the posterior distributions q (Zt|X) and q (Zc|X).
+The variational approximations of their posterior distributions
+are as follows:
+q (Zt|X) =
+DZt∏
+m=1
+N
+(
+µ = ˆµ Ztm , σ 2 = ˆσ 2
+Ztm
+)
+, (4)
+q (Zc|X) =
+DZc∏
+m=1
+N
+(
+µ = ˆµ Zcm , σ 2 = ˆσ 2
+Zcm
+)
+, (5)
+
+========== PAGE 5 ==========
+where µ and σ are the mean and variance of the Gaussian dis-
+tribution captured by neural networks. It is worth noting th at
+Zt and Zc are composed of pairs of user and item samples, so
+each q (Zt|X) and q (Zc|X) has two components: item and
+user. In the generative network, the prior distribution p (Zt)
+follows a Gaussian distribution:
+p (Zt) =
+DZt∏
+m=1
+N (Ztm|0, 1) . (6)
+The prior distribution p (Zc) is obtained based on the Con-
+ditional V AE (CV AE) [Sohn et al., 2015] model. We use
+Monte Carlo (MC) sampling to condition p(Zc) on X:
+Zc∼ p(Zc|X). (7)
+Then, the decoder for X is described as follows:
+p(X|Zt, Z c) =
+DX∏
+m=1
+p (Xm|Zt, Z c) . (8)
+For inference, we optimise the parameters by maximising
+the evidence lower bound (ELBO):
+Lciv =Eq[log p (X|Zt, Z c)]− DKL[q (Zt|X)||p (Zt)]
+− DKL[q (Zc|X)||p (Zc|X)]. (9)
+Note that using CV AE to conditionp(Zc) on X is a critical
+step for learning the representations of Zc and Zt because Zc
+and Zt are independent given X, which ensures that Zt cap-
+tures the CIV information, while Zc capture the confounding
+information given X in the interactive data.
+3.5 Decomposition of Treatment Variable
+After obtaining the representations of CIV ( Zt) and its con-
+ditional set ( Zc) from X, we use the CIV ( Zt) to re-
+construct the treatment variable ( W ) and decompose W
+to derive the causal relationship, speciﬁcally, user prefe r-
+ence. We apply the least squares (LS) method based on
+IV4Rec [Si et al., 2022] to decompose W and obtain the rep-
+resentation ˆWu,i that is not affected by Uc:
+ˆWu,i = fpro (Zt, W u,i) , (10)
+where fpro is the projection function that maps Zt and Wu,i
+into the same space, allowing the unbiased ˆWu,i. The func-
+tion fpro(·) is deﬁned as:
+fpro (Zt, W u,i) = Zt·W u,i, (11)
+where Wu,i is the closed-form solution of the LS method, and
+its calculation formula is as follows:
+Wu,i = arg min
+Wu,i
+∥Zt· Wu,i− Wu,i∥2
+2 = Z †
+t· Wu,i, (12)
+where Z †
+t is the Moore-Penrose pseudo-inverse of Zt. Thus,
+the decomposed Wu,i captures the causal relationship from
+Zt while separating the latent confounding bias introduced by
+Uc, which reﬂects user preferences. Additionally, we need to
+incorporate Zc to obtain the reconstructed W re
+u,i, as Zc blocks
+the confounding bias between Zt and Y . Therefore, our ﬁnal
+reconstructed W re
+u,i is obtained by:
+W re
+u,i = α ˆWu,i + (1− α )Zc, (13)
+where α is a hyperparameter used to balance ˆWu,i and Zc.
+3.6 Click Prediction
+To improve click prediction, we optimize the reconstructed
+treatment variables with BPR loss.
+Lclick =−
+∑
+(u,p,n)∈ D
+ln sigma
+( ⟨
+wre
+u , w re
+p
+⟩
+−⟨ wre
+u , w n⟩
+)
+,
+(14)
+where⟨·⟩ denotes the inner product, and wn is the nega-
+tive sample item that user u has not interacted with, se-
+lected by the Popularity-based Negative Sampling with Mar-
+gin (PNSM) strategy [Zheng et al., 2021]. By combining the
+ELBO and BPR, the ﬁnal loss function of our IDCIV -RS is:
+Ltotal = Lciv + Lclick. (15)
+Therefore, our IDCIV -RS obtain W re
+u,i for click prediction
+by learning the representations of CIV Zt and its condition
+set Zc from X and by decomposing W .
+4 Experiments
+In this section, we conduct experiments on two real-world
+datasets to validate the recommendation performance and de -
+biasing effectiveness of IDCIV -RS.
+4.1 Experimental Settings
+Datasets. We use two publicly real-world datasets: the
+Movielens-10M and the Douban-Movie datasets. Both
+datasets include user IDs, movie IDs, and ratings (1-5) for
+movies and are widely used in recommender system de-
+biasing research. We use a dataset setup commonly used
+in the ﬁeld of debiased recommender systems; speciﬁcally,
+the training set is biased and the test set is unbiased. We
+adopt the data pre-processing approach used in previous stud-
+ies [Zheng et al., 2021].
+Dataset # User # Item # Interaction
+Movielens-10M 37,962 4,819 1,371,473
+Douban-Movie 6,809 1,5012 173,766
+Table 1: Statistics of datasets.
+Baselines. Causal debiasing methods are typically applied
+as enhancements to backbone recommendation models. In
+our experiments, we use MF and LightGCN as the backbone
+models. We compare our approach against ﬁve causality-
+based debiasing methods:
+• IPS [Schnabel et al., 2016]: This method assigns
+weights that are the inverse of an item’s popularity,
+thereby enhancing the impact of less popular items while
+reducing the inﬂuence of more popular ones.
+• IPS-C [Bottou et al., 2013]: This approach caps the
+maximum value of IPS weights to reduce variance
+across the entire weight distribution.
+• CausE [Bonner and V asile, 2018]: This method gener-
+ates two sets of embeddings from the data, which are
+then aligned using regularization techniques to ensure
+their similarity.
+
+========== PAGE 6 ==========
+Dataset Movielens-10M
+TopK=20 TopK=50
+Backbone Method Recall↑ HR↑ NDCG↑ Imp.↑ Recall↑ HR↑ NDCG↑ Imp.↑
+MF
+Original 0.1276 0.4397 0.0832 – 0.2332 0.6308 0.1156 –
+IPS 0.1228 0.4210 0.0779 -3.76% 0.2168 0.6016 0.1070 -7.03%
+IPS-C 0.1277 0.4335 0.0809 +0.08% 0.2224 0.6150 0.1102 -4.63%
+CausE 0.1164 0.4144 0.0770 -8.77% 0.2076 0.5940 0.1047 -10.98%
+DICE 0.1626 0.5202 0.1076 +27.42% 0.2854 0.6941 0.1459 +22.38%
+DCCL 0.1503 0.4874 0.0975 +17.79% 0.2636 0.6676 0.1326 +13.04%
+IDCIV -RS-Causal 0.1660 0.5282 0.1108 +30.09% 0.2895 0.7012 0.1495 +24.14%
+IDCIV -RS 0.17090.17090.1709 0.53620.53620.5362 0.11480.11480.1148 +33.93%+33.93%+33.93% 0.29730.29730.2973 0.70730.70730.7073 0.15420.15420.1542 +27.49%+27.49%+27.49%
+LightGCN
+Original 0.1462 0.4831 0.0952 – 0.2631 0.6688 0.1316 –
+IPS 0.1298 0.4438 0.0849 -11.22% 0.2325 0.6196 0.1170 -11.63%
+IPS-C 0.1327 0.4533 0.0871 -9.23% 0.2383 0.6302 0.1201 -9.43%
+CausE 0.1164 0.4099 0.0727 -20.38% 0.2204 0.6080 0.1046 -16.23%
+DICE 0.1810 0.5564 0.1228 +23.80% 0.3109 0.7219 0.1632 +18.17%
+DCCL 0.1462 0.4824 0.0947 0% 0.2644 0.6711 0.1311 +0.49%
+IDCIV -RS-Causal 0.1784 0.5511 0.1205 +22.02% 0.3056 0.7160 0.1602 +16.15%
+IDCIV -RS 0.18170.18170.1817 0.55820.55820.5582 0.12410.12410.1241 +24.28%+24.28%+24.28% 0.31190.31190.3119 0.72320.72320.7232 0.16450.16450.1645 +18.55%+18.55%+18.55%
+Table 2: The performance of all methods on Movielens-10M. Th e “original” indicates that only the backbone is used, with n o additional
+causal debiasing methods. The best results are highlighted in bold, and the second-best results are underlined.
+Dataset Douban-Movie
+TopK=20 TopK=50
+Backbone Method Recall↑ HR↑ NDCG↑ Imp.↑ Recall↑ HR↑ NDCG↑ Imp.↑
+MF
+Original 0.0214 0.0542 0.0128 – 0.0371 0.0933 0.0171 –
+IPS 0.0172 0.0444 0.0099 -19.63% 0.0282 0.0755 0.0130 -23.99%
+IPS-C 0.0166 0.0446 0.0095 -22.43% 0.0271 0.0761 0.0125 -26.95%
+CausE 0.0149 0.0410 0.0074 -30.37% 0.0273 0.0761 0.0108 -26.42%
+DICE 0.0231 0.0615 0.0133 +7.94% 0.0396 0.1012 0.0178 +6.74%
+DCCL 0.0217 0.0595 0.0123 +1.40% 0.0385 0.1040 0.0170 +3.77%
+IDCIV -RS-Causal 0.0278 0.0736 0.0162 +29.91% 0.0462 0.1213 0.0213 +24.53%
+IDCIV -RS 0.02990.02990.0299 0.07770.07770.0777 0.01710.01710.0171 +39.71%+39.71%+39.71% 0.04800.04800.0480 0.12130.12130.1213 0.02200.02200.0220 +29.38%+29.38%+29.38%
+LightGCN
+Original 0.0375 0.0557 0.0118 – 0.0640 0.0908 0.0155 –
+IPS 0.0352 0.0928 0.0208 -6.13% 0.0619 0.1576 0.0281 -3.28%
+IPS-C 0.0368 0.0980 0.0219 -1.87% 0.0643 0.1657 0.0295 -4.69%
+CausE 0.0263 0.0693 0.0143 -29.87% 0.0463 0.1216 0.0199 -27.66%
+DICE 0.0401 0.1088 0.0232 +6.93% 0.0679 0.1755 0.0310 +6.09%
+DCCL 0.0401 0.1046 0.0225 +6.93% 0.0693 0.1732 0.0306 +8.28%
+IDCIV -RS-Causal 0.0407 0.1125 0.0239 +8.53% 0.0704 0.1840 0.0321 +10.00%
+IDCIV -RS 0.04350.04350.0435 0.11780.11780.1178 0.02520.02520.0252 +16.00%+16.00%+16.00% 0.07240.07240.0724 0.18860.18860.1886 0.03320.03320.0332 +13.13%+13.13%+13.13%
+Table 3: The results of all methods on Douban-Movie. The best is highlighted in bold, and the second-best is underlined.
+• DICE [Zheng et al., 2021]: This method uses Structural
+Causal Modeling (SCM) [Pearl, 2009] to deﬁne user-
+item interactions. This approach leverages the collision
+effect of causal reasoning to enhance training effective-
+ness.
+• DCCL [Zhao et al., 2023]: This method uses con-
+trastive learning to address data sparsity and the sepa-
+ration of these components.
+We did not compare IDCIV -RS with IV -based methods
+like IV4Rec [Si et al., 2022], as these require explicit IVs de-
+rived from domain knowledge or user search data, which our
+datasets lack. In contrast, IDCIV -RS learns CIV represen-
+tations directly from user interactions, avoiding depende nce
+on unavailable or domain-speciﬁc data. This confers greate r
+ﬂexibility and applicability in real-world scenarios.
+Metrics. We evaluate Top-K recommendation under im-
+plicit feedback using Recall, Hit Rate (HR), and NDCG. Re-
+sults reﬂect each method’s best performance under optimal
+settings. “Imp.” denotes the percentage improvement in Re-
+call over the base model.
+4.2 Comparison of Experimental Results
+Tables 2 and 3 present the results of IDCIV -RS and all
+baseline approaches on two real-world datasets. IDCIV-RS-
+Causal is a variant of IDCIV -RS that denotes click prediction
+using only the unbiased embeddings ˆWu,i, which capture the
+
+========== PAGE 7 ==========
+causal relationship.
+The analysis of Tables 2 and 3 shows that IDCIV -RS and
+IDCIV -RS-Causal signiﬁcantly improve performance metrics
+compared to the original backbone, with the highest improve -
+ment reaching 39.71%, demonstrating statistical signiﬁca nce
+and the superiority of our approach. Notably, IDCIV -RS con-
+sistently outperforms IDCIV -RS-Causal, aligning with the
+understanding that incorporating appropriate confounders en-
+hances recommendation performance. This conﬁrms that
+Zc in IDCIV -RS effectively captures relevant confounders in
+user interaction data.
+Tables 2 and 3 provide several key insights: (1) IPS-based
+debiasing methods perform poorly due to their reliance on
+the inverse propensity score, which is sensitive to data dis tri-
+bution. In our experiments, training on a biased dataset and
+testing on an unbiased one led to distribution mismatches. ( 2)
+CausE also underperforms, as it requires an unbiased traini ng
+dataset to align user-item embeddings. (3) Although DICE
+and DCCL, which are based on causal graph assumptions,
+improve performance, they still fall short of optimal resul ts.
+This is because they target speciﬁc biases based on predeﬁne d
+causal graphs, while real-world datasets often contain div erse
+biases from latent confounders, limiting their effectiven ess.
+4.3 Evaluation on Debiasing Experiments Ability
+We use the Intersection Over Union
+(IOU) [Zheng et al., 2021] metric to evaluate the debi-
+asing ability of all methods. A higher IOU reﬂects more
+popular items in the recommendations, indicating weaker
+debiasing performance.
+20 30 40 50
+T opK
+0.000
+0.005
+0.010
+0.015
+0.020
+0.025
+0.030
+0.035
+IOU
+(a)
+20 30 40 50
+20 30 40 50
+T opK
+0.00
+0.01
+0.02
+0.03
+0.04
+0.05
+IOU
+(b)
+20 30 40 50
+MF
+IPS
+IPS-C
+CausE
+DICE
+DCCL
+IDCIV -RS-Causal
+IDCIV -RS
+LightGCN
+Figure 5: The IOU of recommended items and popular items for a ll
+methods on the Douban-movie dataset. (a) IOU of all methods o n
+the MF; (b) IOU of all methods on the LightGCN.
+Figure 5 shows the IOU for all methods on the Douban-
+movie dataset. IDCIV -RS and IDCIV -RS-Causal exhibit the
+lowest IOU, indicating superior debiasing ability. Notabl y,
+the IOU for all baseline methods increases signiﬁcantly as t he
+number of recommended items grows, suggesting that their
+debiasing ability diminishes with more recommendations. I n
+contrast, the debiasing ability of our IDCIV -RS and IDCIV -
+RS-Causal remains relatively stable, demonstrating great er
+robustness.
+Figure 5 also illustrates that the IOU of IDCIV -RS is higher
+than that of IDCIV -RS-Causal, due to IDCIV -RS incorporat-
+ing confounding factor information. This suggests that Zc
+effectively captures confounding factors in user interact ion
+data, validating our method.
+4.4 Ablation Studies
+We perform ablation studies to evaluate the effectiveness o f
+each component in IDCIV -RS. To verify the effectiveness of
+CIV and its condition set, we propose IDCIV-RS-Con, which
+uses only Zc for click prediction. Figure 6 presents the IOU
+and Recall of IDCIV -RS and its variants. The results show
+that IDCIV -RS-Con has the highest IOU and lowest Recall,
+highlighting the effectiveness of Zc in capturing confounding
+factor information. In contrast, IDCIV -RS-Causal exhibit s
+higher Recall but lower IOU than IDCIV -RS-Con, indicat-
+ing its effectiveness in capturing user preference informa tion
+and mitigating confounding factors through Zt. IDCIV -RS,
+by integrating both user preference and confounding factor
+information, achieves higher Recall and IOU than IDCIV -RS-
+Causal, demonstrating the combined effectiveness of Zt and
+Zc.
+20 30 40 50
+T op-K
+0.00
+0.01
+0.02
+0.03
+0.04
+0.05
+R ecall
+R ecall - IDCIV -RS-Con
+R ecall - IDCIV -RS-Causal
+R ecall - IDCIV -RS
+IOU - IDCIV -RS-Con
+IOU - IDCIV -RS-Causal
+IOU - IDCIV -RS
+0.001
+0.002
+0.003
+0.004
+0.005
+0.006
+IOU
+Figure 6: Recall and IOU of MF-based IDCIV-RS and its variant s
+on the Douban-movie dataset. Where the bar represents Recal l and
+the curve represents IOU.
+5 Conclusion
+In this paper, we propose a data-driven CIV debiasing method
+called IDCIV -RS. We learn the representations of CIV and
+its conditional set from user interaction data. The CIV is
+used to decompose the treatment variable and uncover the
+causal relationships between variables, while the conditi onal
+set captures confounding factors in the user interaction da ta.
+Unlike existing IV -based debiasing methods, IDCIV -RS im-
+poses fewer constraints and does not require the selection o f
+speciﬁc IVs based on domain knowledge. By integrating con-
+founding factors and the causal relationships of the treatm ent
+variable, IDCIV -RS achieves high-quality recommendation s
+and effective debiasing. We conducted extensive experiments
+on two real-world datasets to validate the effectiveness an d
+superiority of IDCIV -RS in both recommendation and debi-
+asing performance.
+
+========== PAGE 8 ==========
+Acknowledgments
+This work is supported partly by the Project of Guangxi
+Science and Technology (2025GXNSFFA069015), the Na-
+tional Natural Science Foundation of China (No. 62372119,
+62166003), the Key Lab of Education Blockchain and Intel-
+ligent Technology, Ministry of Education (No. EBME24-
+03), the Research Fund of the Guangxi Key Lab of Multi-
+source Information Mining & Security (MIMS24-M-01), and
+the Australian Research Council (under grant DP230101122).
+References
+[Bonner and V asile, 2018] Stephen Bonner and Flavian
+V asile. Causal embeddings for recommendation. In Pro-
+ceedings of the 12th ACM Conference on Recommender
+Systems, page 104–112, New Y ork, NY , USA, 2018.
+Association for Computing Machinery.
+[Bottou et al., 2013] L´ eon Bottou, Jonas Peters, Joaquin
+Qui˜ nonero-Candela, Denis X. Charles, D. Max Chicker-
+ing, Elon Portugaly, Dipankar Ray, Patrice Simard, and
+Ed Snelson. Counterfactual reasoning and learning sys-
+tems: The example of computational advertising. Jour-
+nal of Machine Learning Research , 14(101):3207–3260,
+2013.
+[Brito and Pearl, 2012 ] Carlos Brito and Judea Pearl.
+Generalized instrumental variables. arXiv preprint
+arXiv:1301.0560, 2012.
+[Cai et al., 2024] Miaomiao Cai, Min Hou, Lei Chen,
+Le Wu, Haoyue Bai, Y ong Li, and Meng Wang. Mitigating
+recommendation biases via group-alignment and global-
+uniformity in representation learning. ACM Transactions
+on Intelligent Systems and T echnology, 2024.
+[Caner and Hansen, 2004 ] Mehmet Caner and Bruce E
+Hansen. Instrumental variable estimation of a threshold
+model. Econometric theory, 20(5):813–843, 2004.
+[Chen et al., 2023] Jiawei Chen, Hande Dong, Xiang Wang,
+Fuli Feng, Meng Wang, and Xiangnan He. Bias and debias
+in recommender system: A survey and future directions.
+ACM Transactions on Information Systems , 41(3):1–39,
+2023.
+[Cheng et al., 2022] Debo Cheng, Jiuyong Li, Lin Liu, Jiji
+Zhang, Jixue Liu, et al. Ancestral instrument method
+for causal inference without complete knowledge. arXiv
+preprint arXiv:2201.03810, 2022.
+[Cheng et al., 2023a] Debo Cheng, Ziqi Xu, Jiuyong Li, Lin
+Liu, Thuc Duy Le, and Jixue Liu. Learning conditional in-
+strumental variable representation for causal effect estima-
+tion. In Joint European Conference on Machine Learning
+and Knowledge Discovery in Databases , pages 525–540.
+Springer, 2023.
+[Cheng et al., 2023b] Debo Cheng, Ziqi Xu, Jiuyong Li, Lin
+Liu, Jixue Liu, and Thuc Duy Le. Causal inference with
+conditional instruments using deep generative models. In
+Proceedings of the AAAI Conference on Artiﬁcial Intelli-
+gence, volume 37, pages 7122–7130, 2023.
+[Cheng et al., 2024a] Debo Cheng, Ziqi Xu, Jiuyong Li, Lin
+Liu, Jixue Liu, Wentao Gao, and Thuc Duy Le. Instrumen-
+tal variable estimation for causal inference in longitudin al
+data with time-dependent latent confounders. In Proceed-
+ings of the AAAI Conference on Artiﬁcial Intelligence , vol-
+ume 38, pages 11480–11488, 2024.
+[Cheng et al., 2024b] Debo Cheng, Ziqi Xu, Jiuyong Li, Lin
+Liu, Jixue Liu, and Thuc Duy Le. Conditional instru-
+mental variable regression with representation learning for
+causal inference. In The Twelfth International Conference
+on Learning Representations, pages 1–17, 2024.
+[Gao et al., 2021] Chongming Gao, Wenqiang Lei, Xiang-
+nan He, Maarten de Rijke, and Tat-Seng Chua. Advances
+and challenges in conversational recommender systems: A
+survey. AI open, 2:100–126, 2021.
+[Gao et al., 2024] Chen Gao, Y u Zheng, Wenjie Wang, Fuli
+Feng, Xiangnan He, and Y ong Li. Causal inference in rec-
+ommender systems: A survey and future directions. ACM
+Transactions on Information Systems, 42(4):1–32, 2024.
+[Gomez-Uribe and Hunt, 2015 ] Carlos A Gomez-Uribe and
+Neil Hunt. The netﬂix recommender system: Algo-
+rithms, business value, and innovation. ACM Transactions
+on Management Information Systems (TMIS) , 6(4):1–19,
+2015.
+[He et al., 2017] Xiangnan He, Lizi Liao, Hanwang Zhang,
+Liqiang Nie, Xia Hu, and Tat-Seng Chua. Neural collab-
+orative ﬁltering. In Proceedings of the 26th international
+conference on world wide web , pages 173–182, 2017.
+[He et al., 2020] Xiangnan He, Kuan Deng, Xiang Wang,
+Y an Li, Y ongdong Zhang, and Meng Wang. Lightgcn:
+Simplifying and powering graph convolution network for
+recommendation. In Proceedings of the 43rd International
+ACM SIGIR conference on research and development in
+Information Retrieval, pages 639–648, 2020.
+[He et al., 2023] Xiangnan He, Y ang Zhang, Fuli Feng,
+Chonggang Song, Lingling Yi, Guohui Ling, and Y ong-
+dong Zhang. Addressing confounding feature issue for
+causal recommendation. ACM Transactions on Informa-
+tion Systems, 41(3):1–23, 2023.
+[Kingma and Welling, 2013] Diederik P Kingma and Max
+Welling. Auto-encoding variational bayes. arXiv preprint
+arXiv:1312.6114, 2013.
+[Koren et al., 2009] Y ehuda Koren, Robert Bell, and Chris
+V olinsky. Matrix factorization techniques for recom-
+mender systems. Computer, 42(8):30–37, 2009.
+[Koren et al., 2021] Y ehuda Koren, Steffen Rendle, and
+Robert Bell. Advances in collaborative ﬁltering. Recom-
+mender systems handbook , pages 91–142, 2021.
+[Lan et al., 2024] Wei Lan, Guoxian Zhou, Qingfeng Chen,
+Wenguang Wang, Shirui Pan, Yi Pan, and Shichao Zhang.
+Contrastive clustering learning for multi-behavior recom -
+mendation. ACM Transactions on Information Systems ,
+43(1):1–23, 2024.
+[Li et al., 2024] Chengyu Li, Debo Cheng, Guixian Zhang,
+and Shichao Zhang. Contrastive learning for fair graph
+
+========== PAGE 9 ==========
+representations via counterfactual graph augmentation.
+Knowledge-Based Systems, 305:112635, 2024.
+[Liao et al., 2022] Jie Liao, Wei Zhou, Fengji Luo, Junhao
+Wen, Min Gao, Xiuhua Li, and Jun Zeng. Sociallgn: Light
+graph convolution network for social recommendation. In-
+formation Sciences, 589:595–607, 2022.
+[Luo et al., 2024] Renqiang Luo, Huafei Huang, Shuo Y u,
+Zhuoyang Han, Estrid He, Xiuzhen Zhang, and Feng Xia.
+Fugnn: Harmonizing fairness and utility in graph neural
+networks. In Proceedings of the 30th ACM SIGKDD Con-
+ference on Knowledge Discovery and Data Mining , pages
+2072–2081, 2024.
+[Luo et al., 2025] Renqiang Luo, Huafei Huang, Ivan Lee,
+Chengpei Xu, Jianzhong Qi, and Feng Xia. Fairgp: A
+scalable and fair graph transformer using graph partition-
+ing. In Proceedings of the AAAI Conference on Artiﬁcial
+Intelligence, volume 39, pages 12319–12327, 2025.
+[Pearl, 2009] Judea Pearl. Causality. Cambridge university
+press, 2009.
+[Rendle et al., 2012] Steffen Rendle, Christoph Freuden-
+thaler, Zeno Gantner, and Lars Schmidt-Thieme. Bpr:
+Bayesian personalized ranking from implicit feedback.
+arXiv preprint arXiv:1205.2618 , 2012.
+[Schnabel et al., 2016] Tobias Schnabel, Adith Swami-
+nathan, Ashudeep Singh, Navin Chandak, and Thorsten
+Joachims. Recommendations as treatments: Debiasing
+learning and evaluation. In Proceedings of The 33rd In-
+ternational Conference on Machine Learning , volume 48,
+pages 1670–1679, New Y ork, New Y ork, USA, 20–22 Jun
+2016. PMLR.
+[Sch¨ olkopfet al., 2021] Bernhard Sch¨ olkopf, Francesco Lo-
+catello, Stefan Bauer, Nan Rosemary Ke, Nal Kalch-
+brenner, Anirudh Goyal, and Y oshua Bengio. Toward
+causal representation learning. Proceedings of the IEEE ,
+109(5):612–634, 2021.
+[Sch¨ olkopf, 2022] Bernhard Sch¨ olkopf. Causality for ma-
+chine learning. In Probabilistic and causal inference: The
+works of Judea Pearl, pages 765–804. 2022.
+[Shoja and Tabrizi, 2019] Babak Maleki Shoja and Nasseh
+Tabrizi. Customer reviews analysis with deep neural net-
+works for e-commerce recommender systems. IEEE ac-
+cess, 7:119121–119130, 2019.
+[Si et al., 2022] Zihua Si, Xueran Han, Xiao Zhang, Jun
+Xu, Y ue Yin, Y ang Song, and Ji-Rong Wen. A model-
+agnostic causal learning framework for recommendation
+using search data. In Proceedings of the ACM W eb Con-
+ference 2022, pages 224–233, 2022.
+[Si et al., 2023a] Zihua Si, Zhongxiang Sun, Xiao Zhang,
+Jun Xu, Y ang Song, Xiaoxue Zang, and Ji-Rong Wen.
+Enhancing recommendation with search data in a causal
+learning manner. ACM Transactions on Information Sys-
+tems, 41(4):1–31, 2023.
+[Si et al., 2023b] Zihua Si, Zhongxiang Sun, Xiao Zhang,
+Jun Xu, Xiaoxue Zang, Y ang Song, Kun Gai, and Ji-Rong
+Wen. When search meets recommendation: Learning dis-
+entangled search representation for recommendation. In
+Proceedings of the 46th International ACM SIGIR Con-
+ference on Research and Development in Information Re-
+trieval, pages 1313–1323, 2023.
+[Sohn et al., 2015] Kihyuk Sohn, Honglak Lee, and Xinchen
+Y an. Learning structured output representation using deep
+conditional generative models. Advances in neural infor-
+mation processing systems, 28, 2015.
+[Wang et al., 2019] Xiang Wang, Xiangnan He, Meng
+Wang, Fuli Feng, and Tat-Seng Chua. Neural graph collab-
+orative ﬁltering. In Proceedings of the 42nd international
+ACM SIGIR conference on Research and development in
+Information Retrieval, pages 165–174, 2019.
+[Wang et al., 2020] Yixin Wang, Dawen Liang, Laurent
+Charlin, and David M Blei. Causal inference for recom-
+mender systems. In Proceedings of the 14th ACM Confer-
+ence on Recommender Systems , pages 426–431, 2020.
+[Wang et al., 2021] Nan Wang, Zhen Qin, Xuanhui Wang,
+and Hongning Wang. Non-clicks mean irrelevant? propen-
+sity ratio scoring as a correction. In Proceedings of the
+14th ACM international conference on web search and
+data mining, pages 481–489, 2021.
+[Wu et al., 2022] Anpeng Wu, Kun Kuang, Bo Li, and Fei
+Wu. Instrumental variable regression with confounder bal-
+ancing. In International Conference on Machine Learning,
+pages 24056–24075. PMLR, 2022.
+[Zhang et al., 2021] Y ang Zhang, Fuli Feng, Xiangnan He,
+Tianxin Wei, Chonggang Song, Guohui Ling, and Y ong-
+dong Zhang. Causal intervention for leveraging popularity
+bias in recommendation. In Proceedings of the 44th inter-
+national ACM SIGIR conference on research and develop-
+ment in information retrieval, pages 11–20, 2021.
+[Zhang et al., 2022] Shichao Zhang, Jiaye Li, Wenzhen
+Zhang, and Y ongsong Qin. Hyper-class representation of
+data. Neurocomputing, 503:200–218, 2022.
+[Zhang et al., 2024] Guixian Zhang, Debo Cheng, Guan
+Y uan, and Shichao Zhang. Learning fair representations
+via rebalancing graph structure. Information Processing
+& Management, 61(1):103570, 2024.
+[Zhang, 2021] Shichao Zhang. Challenges in knn classiﬁca-
+tion. IEEE Transactions on Knowledge and Data Engi-
+neering, 34(10):4663–4675, 2021.
+[Zhao et al., 2023] Weiqi Zhao, Dian Tang, Xin Chen,
+Dawei Lv, Daoli Ou, Biao Li, Peng Jiang, and Kun Gai.
+Disentangled causal embedding with contrastive learning
+for recommender system. In Companion Proceedings of
+the ACM W eb Conference 2023, page 406–410, New Y ork,
+NY , USA, 2023. Association for Computing Machinery.
+[Zheng et al., 2021] Y u Zheng, Chen Gao, Xiang Li, Xiang-
+nan He, Y ong Li, and Depeng Jin. Disentangling user
+interest and conformity for recommendation with causal
+embedding. In Proceedings of the W eb Conference 2021,
+pages 2980–2991, 2021.

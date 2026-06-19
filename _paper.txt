@@ -1,0 +1,1249 @@
+==== PAGE 1 ====
+Contents lists available at ScienceDirect
+Neural Networks
+journal homepage: www.elsevier.com/locate/neunet
+Full Length Article
+Learning instrumental variable representation for debiasing in 
+recommender systems 
+Zhirong Huang
+ a,b, Shichao Zhang a,b,∗, Debo Cheng
+ c,∗, Jiuyong Li
+ c, Lin Liu
+ c, 
+Guangquan Lu
+ a,b, Guixian Zhang
+ d
+a Key Lab of Education Blockchain and Intelligent Technology, Ministry of Education, Guangxi Normal University, Guilin, 541004, Guangxi, China
+b Guangxi Key Lab of Multi-Source Information Mining and Security, Guangxi Normal University, Guilin, 541004, Guangxi, China
+c UniSA STEM, University of South Australia, Mawson Lakes, Adelaide, Australia
+d School of Computer Science and Technology, China University of Mining and Technology, Xuzhou, 221116, Jiangsu, China
+a r t i c l e  i n f o
+Keywords:
+Recommender systems
+Instrumental variable
+Confounding bias
+Latent confounders
+ a b s t r a c t
+Recommender systems are essential for ﬁltering content to match user preferences. However, traditional recom-
+mender systems often suﬀer from biases inherent in the data, such as popularity bias. These biases, particularly 
+those stemming from latent confounders, can result in inaccurate recommendations and reduce both the diver-
+sity and eﬀectiveness of the system. Existing debiasing methods for recommender systems, however, either fail 
+to account for latent confounders or rely on predeﬁned instrumental variables (IVs). To address this research 
+gap, we propose a novel causality-based recommendation algorithm, Data-driven IV representation learning for 
+debiasing in Recommender System (DIVRS), which enables the learning of IV representation directly from user-
+item interaction data. By leveraging the learned IV representation, DIVRS decomposes user behaviour into causal 
+and confounding relationships to address potential bias in recommender systems. Additionally, we introduce Or-
+thogonal Promotion Regularisation (OPR) for DIVRS to address the problem that Graph Convolutional Networks 
+(GCNs) amplify bias. We also propose a variant of GCNs for DIVRS, called DIVRS-GCN. Experimental results 
+on the Douban-Movie and Movielens-10M datasets demonstrate that both DIVRS and DIVRS-GCN eﬀectively 
+mitigate confounding bias while outperform the state-of-the-art methods in recommendation performance. For 
+example, on both datasets, our DIVRS and DIVRS-GCN improve Recall@20 by up to 10.98 %. This validates their 
+eﬀectiveness and robustness. Our approaches improve recommendation accuracy while delivering more balanced 
+and diverse suggestions, eﬀectively addressing the limitations of existing IV-based recommender systems.
+1.  Introduction
+In today’s era of information overload (Zhang et al., 2022), users 
+often face the challenge of navigating an overwhelming abundance of 
+content, making it diﬃcult to identify what truly aligns with their pref-
+erences. Recommender systems play a crucial role in addressing this 
+issue by analyzing user interaction data to predict preferences and sug-
+gest items users are likely to enjoy (Qiu et al., 2020; Roy & Dutta, 
+2022). These systems are widely employed across various online plat-
+forms, including e-commerce (Alamdari et al., 2020) and streaming ser-
+vices (Chang et al., 2017), enhancing user satisfaction and delivering sig-
+niﬁcant business value. For example, recommending movies that match 
+user preferences can substantially increase the likelihood of users pur-
+chasing viewing subscriptions. However, these systems often contend 
+with data biases (Chen et al., 2023). For example, suppose a user is in-
+∗ Corresponding authors.
+ E-mail addresses: huangzr@stu.gxnu.edu.cn (Z. Huang), zhangsc@mailbox.gxnu.edu.cn (S. Zhang), chengdb2016@gmail.com (D. Cheng).
+terested in niche sci-ﬁ movies, but the recommended content is mainly 
+popular commercial blockbusters. This occurs because the system is af-
+fected by popularity bias, thus weakening the personalisation of rec-
+ommendations. To mitigate this problem, causal inference methods are 
+often employed to identify and correct such biases, thereby preventing 
+them from aﬀecting the learning eﬀect of the model. As a result, which 
+in turn improves the personalisation and eﬀectiveness of recommenda-
+tions (Li et al., 2024).
+Recently, debiasing representation learning has become an impor-
+tant research area for recommender systems (Chen et al., 2021; Man-
+soury et al., 2020; Sun et al., 2019). Advances in causal inference (Cheng 
+et al., 2024a; Lin et al., 2024; Yao et al., 2021) have led to the develop-
+ment of a range of debiasing methods based on causal inference. For in-
+stance,  Zhang et al. (2021) developed a novel causal graph to model the 
+generative mechanisms of historical user behaviour data and proposed 
+https://doi.org/10.1016/j.neunet.2025.107977
+Received 3 December 2024; Received in revised form 22 July 2025; Accepted 9 August 2025
+Neural Networks 193 (2026) 107977 
+Available online 12 August 2025 
+0893-6080/© 2025 Elsevier Ltd. All rights are reserved, including those for text and data mining, AI training, and similar technologies. 
+==== PAGE 2 ====
+Z. Huang et al.
+Fig. 1. Causal graph representing the IV4Rec framework (Si et al., 2023a), 
+where user search is used as an IV, i.e. 𝑉 . The dotted bidirectional arrow in-
+dicates the non-causal relationship caused by latent confounders. 𝐶, 𝑊 and 𝑌
+represent the confounding variable (e.g., item popularity), the treatment vari-
+able (i.e., user-item pair embedding), and the outcome variable (i.e., user feed-
+back).
+the Popularity-bias Deconfounding and Adjusting (PDA) method to iden-
+tify and mitigate popularity bias. While these methods have achieved 
+some success, they require stringent causal graphs to describe data gen-
+eration assumptions. If the actual circumstances deviate signiﬁcantly 
+from the assumptions in the causal graph, the eﬀectiveness of these 
+methods may be compromised (Cai et al., 2024a).
+Latent confounders pose a main challenge for debiasing in rec-
+ommender systems. These are variables (e.g., item popularity or the 
+weather in the user’s area) that are not directly measured but inﬂuence 
+both the input (e.g., user behaviour, or item features) and the output 
+(e.g., rating). The instrumental variable (IV) approach is a well-known 
+method to address the problem of latent confounders in causal infer-
+ence (Cheng et al., 2024a).  Si et al. (2022) proposed IV4Rec, where they 
+used self-collected user search data to abstract user feedback due to var-
+ious biases (measurement and latent confounders) as the non-causal re-
+lationship (i.e., confounding relationship) of user behaviour and model 
+user preferences as the causal relationship, as shown in Fig. 1. However, 
+in real-world scenarios, obtaining user search data is more challenging 
+due to privacy protection policies and other constraints. This lack of 
+detailed search data imposes strict constraints on the IV debiasing ap-
+proach represented by IV4Rec (Si et al., 2023a,b). Therefore, the ques-
+tion of how to obtain a valid IV (Pearl, 2009) in recommender systems 
+remains open.
+To mitigate confounding bias in recommendation systems, we pro-
+pose learning surrogate instrumental variables (SIVs) directly from user-
+item interaction data. The motivation for this approach lies in the fact 
+that, in many real-world scenarios, true IVs are often unobservable, ei-
+ther due to privacy constraints (e.g., limited access to user search his-
+tory) or technical limitations in measuring intrinsic states such as user 
+intent. However, the inﬂuence of such unobservable IVs is often implic-
+itly captured in observable user interaction behaviour. For example, a 
+user’s speciﬁc viewing intent constitutes an unobservable IV. Neverthe-
+less, their prior interaction behaviour (i.e., videos clicked or browsed 
+before making a selection) before making their ﬁnal choice is fully 
+recorded. These behaviours provide the data foundation for learning an 
+SIV that can represent their underlying intentions. We treat the embed-
+ded representation of user-item pairs as the treatment variable 𝑊  and 
+user feedback as the outcome variable 𝑌 , then recover a valid SIV repre-
+sentation 𝑆 from existing user-item interaction data, as shown in Fig. 2. 
+Speciﬁcally, in Figs. 1 and 2, 𝑉  is a causal IV and 𝑆 is a SIV; they are 
+both IV, but as previously highlighted, because user search data is dif-
+ﬁcult to collect, they are often unobservable. In causal inference, when 
+the IV is unobserved, a reasonably observable variable can be sought as 
+a SIV for IV estimation (Cheng et al., 2024a; Hernan & Robins, 2024). 
+Thus, we identify SIVs within user-item interaction data, which implic-
+itly captures interactions inﬂuenced by unobservable factors, such as 
+user search behaviour, while remaining observable themselves.
+Fig. 2. In the causal graph of our DIVRS and DIVRS-GCN approach, learns ef-
+fective IV from existing historical user behavioural data. where 𝑆 denotes the 
+surrogate instrument.
+In this study, we propose a novel recommendation algorithm, called 
+Data-driven IV representation learning for debiasing in Recommender 
+System (DIVRS). Unlike existing IV-based methods, DIVRS does not 
+need to rely on domain knowledge or additional expert input, instead 
+learning the representation of SIVs directly from existing user-item in-
+teraction data. Speciﬁcally, DIVRS recovers SIV 𝑆 via representation 
+learning from user-item interaction data through a data-driven ap-
+proach based on a MF backbone network, and uses the learned SIV 
+representations to decompose and reconstruct the treatment variables 
+in order to more accurately model the causal and confounding rela-
+tionships of user behaviours. Fig. 2 illustrates the causal graph of DI-
+VRS. With the explosive growth of graph-structured data, Graph Con-
+volutional Network (GCN) (He et al., 2020; Wang et al., 2019) have 
+demonstrated excellent performance in capturing the neighbourhood 
+information in graph data. However, while GCNs can enhance rec-
+ommendation qualtiy, they also propagates noise during neighbour-
+hood aggregation, which ampliﬁes confounding factors present in the 
+data (Chen et al., 2024). To address this, we integrate DIVRS with 
+GCN, aimting to mitigate these issues. However, simple fusion alone 
+is insuﬃcient to eﬀectively eliminate the inﬂuence of confounding fac-
+tors. Therefore, we further introduce Orthogonal Promotion Regular-
+ization (OPR) and propose DIVRS-GCN to suppress the noise propaga-
+tion, so as to enhance the fusion eﬀect of DIVRS and GCN, and improve 
+the recommendation performance and debiasing ability of the recom-
+mender system. The main contributions of our work are summarized
+below:
+• We propose a novel debiasing method, DIVRS, to learn the SIV repre-
+sentation from historical user behaviour data, eﬀectively decompos-
+ing and capturing the causal and confounding relationships of user 
+behaviour, which greatly alleviates the constraints of selecting an 
+SIV.
+• To the best of our knowledge, this is the ﬁrst work to introduce SIV 
+into GCN. We present DIVRS-GCN, an extension of DIVRS speciﬁcally 
+designed for GCN. DIVRS-GCN incorporates OPR techniques to adapt 
+to the domain aggregation features of GCNs.
+• Extensive experiments conducted on two real-world datasets demon-
+strate the eﬀectiveness and advantages of the proposed DIVRS and 
+DIVRS-GCN methods in mitigating bias and improving recommen-
+dation quality.
+2.  Related work
+In this section, we provide an overview of related work, focusing on 
+traditional and causal recommendation methods.
+2.1.  Traditional recommendation methods
+Mainstream recommendation methods are primarily designed based 
+on the collaborative ﬁltering paradigm, which forecasts user preferences 
+Neural Networks 193 (2026) 107977 
+2 
+==== PAGE 3 ====
+Z. Huang et al.
+by examining the similarities between users or items (He et al., 2025; 
+Koren et al., 2021). Collaborative ﬁltering assumes that the items cho-
+sen by a user reﬂect their preferences. Among recommender systems, 
+MF (Koren et al., 2009) is a foundational technique, decomposing the 
+user behaviour matrix into the product of user and item feature matri-
+ces to predict preferences. However, MF uniformly treats unobserved 
+user behaviour as negative samples, meaning it assumes that a user’s 
+failure to choose certain items indicates a lack of interest in those items. 
+Nevertheless, it is also conceivable that these unobserved interactions 
+are simply due to the user not having had the opportunity to engage 
+with them. In light of this,  Rendle et al. (2012) proposed the Bayesian 
+Personalized Ranking (BPR) algorithm, which posits that users have 
+a lesser preference for unselected items compared to those they have 
+chosen. The BPR algorithm is speciﬁcally designed to optimize the or-
+der of users’ preferences for items, aiming to deliver more personal-
+ized and precise recommendations within recommender systems. To this 
+day, it remains the prevalent loss function in the ﬁeld of recommender
+systems.
+With the progress of deep learning technique (Bai et al., 2021; Liu 
+& Tao, 2015; Xia et al., 2020),  He et al. (2017) proposed the NCF 
+framework, which employs Multi-Layer Perceptron (MLP) instead of 
+the conventional inner product operation to predict user preferences. 
+This allows NCF to more eﬀectively capture the nonlinear relationships 
+in user behaviour. Researchers have incorporated graph-based struc-
+tures (Zhang et al., 2024b, 2025) into recommender systems to cap-
+ture the interaction dynamics between users and items more eﬀectively. 
+Wang et al. (2019) introduced the Neural Graph Collaborative Filtering 
+(NGCF) framework, which utilizes GCN to map interaction information 
+between users and items into the embedding space, substantially en-
+hancing the recommendation outcomes. However,  He et al. (2020) re-
+tained only the domain aggregation component of NGCF and proposed 
+the LightGCN model to further improve the recommendation perfor-
+mance. They found that LightGCN ampliﬁes popularity bias, reinforc-
+ing popular items and compromising personalization. To address this, 
+DAP (Chen et al., 2024) was proposed to correct bias during inference. 
+Although traditional methods have achieved notable success in recom-
+mender systems, they often fail to fully address the inﬂuence of various 
+biases, such as popularity bias, on the recommendations (Ko et al., 2022; 
+Xu et al., 2023). During the training process, these biases may inadver-
+tently be ampliﬁed, leading to models that tend to recommend popular 
+items over those that users genuinely prefer.
+2.2.  Causal recommendation methods
+Recently, a range of causal inference-based debiasing methods have 
+emerged to tackle various biases in recommender systems. Initially, In-
+verse Propensity Scoring (IPS) methods were employed to adjust the 
+weight of each item, balancing the importance of less popular and trendy 
+items to achieve the goal of mitigating the popularity bias (Bottou et al., 
+2013; Schnabel et al., 2016; Wang et al., 2021). With the advancement 
+of causal inference techniques (Cai et al., 2023, 2024b) in the realm of 
+recommender systems, researchers have introduced causal graphs to de-
+scribe and analyze the generation mechanisms of user behaviour data, 
+thereby addressing the impact of various biases (such as popularity and 
+conformity biases) on the recommender system. Zheng et al. (2021) in-
+troduced a novel causal graph that models user interaction behaviour 
+due to their interests and conformity and proposed the Disentangling 
+Interest and Conformity with Causal Embedding (DICE) method to mit-
+igate the impact of conformity bias on recommender systems.  Zhang 
+et al. (2021) analyzed the impact of popularity bias on recommender 
+systems through causal graphs and proposed the PDA method to iden-
+tify and mitigate the eﬀects of popularity bias.  Zhang et al. (2024a)
+proposed PopGo, a debiasing strategy that quantiﬁes the popularity 
+shortcut in user-item interactions, leveraging causal inference and in-
+formation theory to enhance the generalization of collaborative ﬁltering 
+under popularity shifts. However, if the biases inherent in the recom-
+mender system do not align with the causal graphs of these methods, 
+their applicability may be limited. Moreover, the numerous and often 
+unobservable types of biases impose constraints on the eﬀectiveness of 
+these debiasing methods.
+ Si et al. (2022) proposed the IV4Rec framework to decompose user 
+behaviour into higher-level causal and non-causal (i.e., confounding) 
+relationships by using the user’s search data as an IV, which allevi-
+ates the constraints of the causal graph-based approach to a certain 
+extent and signiﬁcantly improves the performance of recommender sys-
+tems. In this case, the causal relationship reﬂects the user’s preferences, 
+while the confounding relationship represents the spurious correlations 
+in the user’s behavioural data due to various biases. However, IV4Rec 
+uses the user’s search data as the IV, which largely limits the appli-
+cation of IV methods in the ﬁeld of recommender system debiasing 
+since search data is diﬃcult to collect in real-world recommender sys-
+tems, especially streaming online services. In this paper, we propose 
+a data-driven method that learns an SIV representation from existing 
+user behaviour data and uses the learned IV representation to decom-
+pose user behaviours into causal and confounding relationships, eﬀec-
+tively mitigating bias while alleviating the application constraints of the
+approach.
+3.  Preliminaries
+In this section, we deﬁne the problem and introduce the fundamental 
+concepts of IV utilized in our work.
+3.1.  Problem deﬁnition
+The user historical behaviour data 𝐷 of a recommender system usu-
+ally contains two sets: a set of users 𝑈 and a set of items 𝐼. Suppose 
+𝑢 denotes a user in 𝑈 , 𝑖 denotes an item in 𝐼. The user historical be-
+haviour data can usually be represented as a collection of user-item 
+pairs: 𝐷 = {(𝑢, 𝑖) ∶ 𝑢 ∈ 𝑈 , 𝑖 ∈ 𝐼}. The user behaviour data 𝐷 contains 
+the user-item interaction data 𝐷+ = {(𝑢, 𝑛) ∶ 𝑢 ∈ 𝑈 , 𝑖 is selected by 𝑢}, 
+which consists of the user 𝑢 as well as the item 𝑛 of his choice (posi-
+tive sample).
+In model-based collaborative ﬁltering, both users and items are typ-
+ically represented by low-dimensional embeddings 𝑊 , where the em-
+bedding of a user-item pair is denoted as 𝑊 = {(𝑤𝑢, 𝑤𝑖
+) ∶ 𝑢 ∈ 𝑈 , 𝑖 ∈ 𝐼}. 
+However, in addition to reﬂecting user preferences (i.e., causal relation-
+ship), historical user behaviour data also contain spurious correlations 
+caused by various biases (i.e., confounding relationship). Although ex-
+isting methods mitigate these biases to some extent with causal graph 
+assumptions and IV, the causal graphs they assume and the IV they pick 
+are strictly constrained. We aim to tackle this challenging problem in 
+our work, and the problem deﬁnition is outlined below.
+Deﬁnition 1. In a recommender system, the reasons behind a user’s in-
+teraction with an item can typically be categorized into two aspects: 
+causal and confounding relationships. The causal relationship repre-
+sents the user’s preferences, while the confounding relationship reﬂects 
+choices made due to the inﬂuence of various confounding factors 𝐶
+(e.g., item exposure, social inﬂuence). Our goal is to automatically learn 
+the representation of an SIV 𝑆 from existing user-item interaction data 
+𝐷+, and then use the learned 𝑆 to decompose the causal and confound-
+ing relationships of user-item embedded pairs 𝑊 , to better improve the 
+model’s recommendation eﬀectiveness and debiasing ability. 
+3.2.  Instrumental variables
+In causal inference, IV methods are commonly employed to miti-
+gate the impact of confounding factors. (Bowden & Turkington, 1990; 
+Ullah et al., 2021). In recommender systems, many unobservable con-
+founding factors aﬀect the user’s choices, e.g., item popularity aﬀects 
+the items that the user can choose. This user feedback, which is inﬂu-
+enced by confounding factors, is collected in historical user behaviour 
+Neural Networks 193 (2026) 107977 
+3 
+==== PAGE 4 ====
+Z. Huang et al.
+Fig. 3. Schematic diagram illustrating IV. where 𝑉 denotes the IV, 𝑊 denotes 
+the treatment variable, 𝐶 denotes the confounding variable, and 𝑌 denotes the 
+outcome variable.
+Fig. 4. Schematic diagram of the surrogate instrument. where 𝑉 is the causal 
+IV, and 𝑆 is the surrogate IV.
+data, leading to a series of biases (e.g., popularity bias) that ultimately 
+aﬀect the recommendation model, causing it to fail to accurately predict 
+user preferences.
+Deﬁnition 2  (Instrumental Variables (IV) Hernan & Robins, 2024). A 
+variable 𝑉  is an IV when it satisﬁes the following three conditions:
+1. 𝑉  is correlated with the treatment variable 𝑊
+2. 𝑉  does not directly aﬀect 𝑌 except indirectly through 𝑊  for the 
+outcome variable 𝑌
+3. 𝑉  and 𝑌 do not share causes
+The causal Directed Acyclic Graph (DAG) in Fig. 3 shows an example 
+of IV. Note that Conditions 2 and 3 are not testable in real-life cases. So 
+there is not a suﬃcient way to verify the soundness of IV (Cheng et al., 
+2023b; Hernan & Robins, 2024).
+In practice, IVs are usually speciﬁed using domain knowledge (Cheng 
+et al., 2024a; Pearl, 2009), but the knowledge IVs is often hard to ac-
+quire. Fortunately, the Surrogate Instrumental Variable (SIV) provides 
+a useful solution for recovering an IV (Cheng et al., 2023b,c; Hernan & 
+Robins, 2024). It should be noted that the surrogate instrumental vari-
+able (SIV) is related to the causal instrumental variable. The SIV has no 
+causal eﬀect on the treatment variable but satisﬁes the conditions for an 
+instrumental variable. Speciﬁcally, the correlation between the SIV and 
+the treatment variable stems from a common cause 𝑉 . At the same time, 
+the Condition 3 of Deﬁnition 2 is modiﬁed to ‘S and Y have no common 
+Fig. 5. The overall architecture of the proposed DIVRS and its extension, DIVRS-GCN. There are four stages in total. First, in the feature encoding phase, DIVRS (or 
+DIVRS-GCN) uses MF (or LightGCN) to encode the original treatment variable 𝑊 𝑜𝑟𝑖
+𝑢,𝑖  and the treatment variable 𝑊𝑢,𝑖 from user behaviour data 𝐷, and the SIV 𝑆𝑢,𝑖
+from interaction data 𝐷+. In the second stage, we optimally update 𝑊 𝑜𝑟𝑖
+𝑢,𝑖  to ﬁt the user’s historical data while making 𝑆𝑢,𝑛 as relevant as possible to it in the latent 
+space for the purpose of recovering the SIV from 𝐷+. In the third stage, the learned eﬀective SIV representation 𝑆𝑢,𝑖 is used to decompose and reconstruct 𝑊𝑢,𝑖 as 
+shown in Fig. 6, and ﬁnally, the reconstructed treatment variable 𝑊 𝑟𝑒
+𝑢,𝑖 is used to optimise the click prediction. Note that DIVRS-GCN also needs to introduce the OPR 
+technique in the third stage, as shown by the dotted line in the ﬁgure.
+cause other than 𝑉 .’ (Hernan & Robins, 2024) As shown in Fig. 4, 𝑉  is 
+a causal IV, and 𝑆 is a SIV.
+In recommender systems, the user’s search data can serve as a causal 
+IV (Si et al., 2022), but they are usually unmeasured. To address this 
+challenge, we aim to recover the SIV from historical user behaviour 
+data using a representation learning approach. It is worth noting that 
+user queries implicitly lead to user clicks, which are recorded and can 
+be regarded as a SIV. In this work, we embed user IDs and item IDs into 
+user-item pairs as treatment variables 𝑊 , user feedback as outcome vari-
+ables 𝑌 , latent biases (e.g. Item popularity) in the data as confounding 
+variables 𝐶, and learn the SIV representations 𝑆 from positive samples 
+of user-item pairs (i.e., users and their selected items). It is crucial to 
+note that the diﬀerence between 𝑆 and 𝑊  lies in their use of sample 
+pairs: 𝑆 uses only positive sample pairs, whereas 𝑊  uses both positive 
+and negative sample pairs. This distinction is signiﬁcant because user 
+feedback, resulting from search behaviour, exists only in the positive 
+sample pairs.
+4.  The proposed DIVRS method
+This section describes the four main steps of DIVRS, as shown in 
+Fig. 5. First, the IV representations are learned at the embedding layer 
+based on available historical user behaviour data. Next, the learned IV 
+is used to perform regression and residual operations on the treatment 
+variable, decomposing them to capture the causal and confounding re-
+lationships between the treatment and the outcome variable. Then, the 
+causal and confounding relationships are used to reconstruct the treat-
+ment variables and ﬁnally, perform click prediction (i.e., predicting user 
+feedback on whether an item will be selected or not). Additionally, we 
+introduce our GCN-based DIVRS for handling complex user-item inter-
+action data.
+4.1.  Constructing the representations of IV and treatment variable
+In this paper, the embedding representations of user-item pairs are 
+used as a treatment variable in the causal view of the recommender 
+system. This includes the user’s original embeddings and those of the 
+corresponding interacting items.
+𝑊 𝑜𝑟𝑖
+𝑢,𝑖 = {(𝑤𝑜𝑟𝑖
+𝑢 , 𝑤𝑜𝑟𝑖
+𝑖 ) ∶ 𝑢 ∈ 𝑈 , 𝑖 ∈ 𝐼}, (1)
+𝑊𝑢,𝑖 = {(𝑤𝑢, 𝑤𝑖) ∶ 𝑢 ∈ 𝑈 , 𝑖 ∈ 𝐼}, (2)
+where 𝑤𝑜𝑟𝑖
+𝑢  (or 𝑤𝑢) and 𝑤𝑜𝑟𝑖
+𝑖  (or 𝑤𝑖) denote the embeddings of user 𝑢
+and item 𝑖, respectively. 𝑈 denotes the set of users, and 𝐼 denotes the 
+Neural Networks 193 (2026) 107977 
+4 
+==== PAGE 5 ====
+Z. Huang et al.
+Fig. 6. The SIV framework decomposes and reconstructs the workﬂow for processing variables. Speciﬁcally, SIV 𝑆𝑢,𝑛 decomposes the positive samples in 𝑊𝑢,𝑖 into 
+a causal relationship ̂𝑊𝑢,𝑛 and a confounding relationship ̃𝑊𝑢,𝑛 through regression and residual operations, and then fuses these two relationship to obtain the ﬁnal 
+reconstructed treatment variables 𝑊 𝑟𝑒
+𝑢,𝑛. Notably, due to the additional bias introduced by GCN domain aggregation, DIVRS-GCN requires an OPR operation for the 
+confounding relationship of the SIV and the treatment variables, as illustrated by the dotted line in the ﬁgure.
+items. The embedded pair representation of the SIV is learnt from the 
+user-item interaction data 𝐷+ as:
+𝑆𝑢,𝑛 = {(𝑠𝑢, 𝑠𝑛) ∶ 𝑢 ∈ 𝑈 , 𝑛 ∈ 𝐼 +
+𝑢
+}, (3)
+where 𝑠𝑢 and 𝑠𝑛 denote the corresponding SIV embeddings for user 𝑢 and 
+item 𝑛, respectively, and 𝐼 +
+𝑢  denotes the items that user 𝑢 has interacted 
+with. 𝑆𝑢,𝑛, 𝑊 𝑜𝑟𝑖
+𝑢,𝑖  and 𝑊𝑢,𝑖 are both initialised using a normal distribu-
+tion. It is crucial to highlight that the diﬀerence between 𝑊 𝑜𝑟𝑖
+𝑢,𝑖  and 𝑊𝑢,𝑖
+lies in their respective purposes: 𝑊 𝑜𝑟𝑖
+𝑢,𝑖  is designed to learn the SIV 𝑆𝑢,𝑛, 
+whereas 𝑊𝑢,𝑖 is employed to decompose user behaviour into causal and 
+confounding relationships, as shown in Figs. 5 and 6.
+4.2.  Learning IV representation
+The SIV needs to be correlated with the treatment variables, and to 
+fulﬁl this requirement, we incorporate 𝑆𝑢,𝑛 and 𝑊 𝑜𝑟𝑖
+𝑢,𝑖  in the embedding 
+layer. This step is crucial because SIV 𝑆𝑢,𝑛 must have some correlation 
+with the original treatment variable 𝑊 𝑜𝑟𝑖
+𝑢,𝑖  to ensure the validity of sub-
+sequent causal inferences.
+Initially, since 𝑊 𝑜𝑟𝑖
+𝑢,𝑖  is initialised using a normal distribution, it does 
+not eﬀectively ﬁt the user’s historical behavioural data, i.e., it does not 
+eﬀectively predict the outcome variable (click probability). Therefore, 
+we need to learn to update the treatment variable 𝑊 𝑜𝑟𝑖
+𝑢,𝑖 . We use the 
+BPR, which is commonly used in recommendation algorithms, to opti-
+mize the treatment variable 𝑊 𝑜𝑟𝑖
+𝑢,𝑖 . The BPR loss function is a widely used 
+method in recommender systems that optimizes the embedded repre-
+sentations of users and items by comparing the preference diﬀerences 
+between items the user has interacted with and those they have not:
+𝑡𝑟𝑒 = −
+∑
+(𝑢,𝑛,𝑝)∈𝐷
+ln 𝜎(< 𝑤 𝑜𝑟𝑖
+𝑢 , 𝑤𝑜𝑟𝑖
+𝑛 > − < 𝑤 𝑜𝑟𝑖
+𝑢 , 𝑤𝑜𝑟𝑖
+𝑝 >), (4)
+where ⟨⋅, ⋅⟩ denotes the inner product operation, and 𝑝 ∈ 𝐼 −
+𝑢  denotes the 
+set of items with which user 𝑢 has not interacted. Next, to ensure the 
+correlation between the IV 𝑆𝑢,𝑛 and the treatment variable 𝑊 𝑜𝑟𝑖
+𝑢,𝑛  in the 
+feature space, the absolute value of cosine similarity is used as a measure 
+in this paper:
+𝑐𝑜𝑟 = −
+∑
+(𝑢,𝑛)∈𝐷+
+| cos(𝑠𝑢,𝑛, 𝑤𝑜𝑟𝑖
+𝑢,𝑛)|, (5)
+where the cosine similarity calculation is noted as cos(⋅). It is worth not-
+ing that SIVs are recovered in Eq. (5) using the user-item interaction 
+data 𝐷+ because SIVs are implicit in the interaction data. For example, 
+a user’s interaction may result from a search behaviour, which is re-
+ﬂected in 𝐷+ (i.e., 𝑉 → 𝑆 in Fig. 2) and also appears in D (i.e., 𝑉 → 𝑊
+in Fig. 2). However, unlike 𝐷+, the 𝐷 also includes negative samples 
+(i.e., items with which user did not interact), which can complicate the 
+accurate recovery of SIVs. The degree of correlation between 𝑆𝑢,𝑛 and 
+𝑊 𝑜𝑟𝑖
+𝑢,𝑛  can be accurately measured by computing the absolute value of 
+their cosine similarity. The absolute value was used to ensure that the 
+correlation between the SIV and the treatment variable was captured. 
+Since correlations can be positive or negative and we do not know the 
+direction of the correlation between the SIV and the treatment variable, 
+using absolute values guarantees that the correlation is detected. The 
+selection of SIV is crucial to mitigate confounding bias. However, the 
+selection of IVs in previous studies has often relied on the knowledge 
+of domain experts and additional information, limiting their usefulness. 
+For example, many causal inference studies require IVs to satisfy strong 
+independence assumptions, which are often diﬃcult to verify and satisfy 
+in practical applications (Cheng et al., 2023a, 2024b, 2023c,d). DIVRS 
+eﬀectively removes this constraint by learning the SIV from historical 
+user behavioural data, making the selection more practical.
+4.3.  Decompose and reconstruct treatment variables
+The objective of DIVRS is to use the learnt SIV 𝑆𝑢,𝑛 to decompose 
+the treatment variable 𝑊𝑢,𝑛 ∈ 𝑊𝑢,𝑖, enabling accurate identiﬁcation of 
+the causal and confounding components in the relationship between the 
+treatment and outcome variables, as shown in Fig. 6.
+Speciﬁcally, DIVRS ﬁrst obtains SIV 𝑆𝑢,𝑛 based on the original treat-
+ment variable 𝑊 𝑜𝑟𝑖
+𝑢,𝑛 . Then, we use SIV 𝑆𝑢,𝑛 combined with the least 
+squares method for regression analysis of the treatment variable 𝑊𝑢,𝑛
+to obtain the variable ̂𝑊𝑢,𝑛 that is not aﬀected by confounding variables 
+by referring to the method of Si et al. (2022). 
+̂𝑊𝑢,𝑛 = { ̂𝑤𝑢,𝑛 = 𝑓𝑝𝑟𝑜(𝑆𝑢,𝑛, 𝑊𝑢,𝑛)}, (6)
+where 𝑓𝑝𝑟𝑜(𝑆𝑢,𝑛, 𝑊𝑢,𝑛) is a projection function:
+𝑓𝑝𝑟𝑜(𝑆𝑢,𝑛, 𝑊𝑢,𝑛) = 𝑆𝑢,𝑛 ⋅ 𝑢,𝑛, (7)
+where 𝑢,𝑛 is the closed solution of the least squares. The projection 
+function projects the information of 𝑆𝑢,𝑛 into the direction of 𝑢,𝑛, be-
+cause 𝑆𝑢,𝑛 is learned from the historical user behavioural data, which 
+leads to a certain amount of user behavioural information contained in 
+𝑆𝑢,𝑛, and the projection operation enriches and enhances the informa-
+tion of 𝑢,𝑛. The exact calculation of 𝑢,𝑛 is as follows:
+𝑢,𝑛 = 𝑎𝑟𝑔 min
+𝑊𝑢,𝑛
+||𝑆𝑢,𝑛 ⋅ 𝑊𝑢,𝑛 − 𝑊𝑢,𝑛||2
+2 = 𝑆+
+𝑢,𝑛 ⋅ 𝑊𝑢,𝑛, (8)
+where 𝑆+
+𝑢,𝑛 is the Moore-Penrose pseudo-inverse of 𝑆𝑢,𝑛. Using least 
+squares, DIVRS obtains a debiased embedding representation ̂𝑊𝑢,𝑛 (i.e., 
+causal relationship), which eﬀectively captures the causal link between 
+the treatment and outcome variables and also mitigates the eﬀects of 
+confounding variables.
+Neural Networks 193 (2026) 107977 
+5 
+==== PAGE 6 ====
+Z. Huang et al.
+Existing research has shown that the eﬀects of confounding vari-
+ables on recommender systems are not all negative (Zhao et al., 2022). 
+Therefore, to ensure the eﬀectiveness of recommendations, it is also nec-
+essary to preserve the confounding relationship between the treatment 
+and outcome variables. Next, residual operations are used to obtain the 
+embedding representation ̃𝑊𝑢,𝑛 of the confounding relationship:
+̃𝑊𝑢,𝑛 = 𝑊𝑢,𝑛 − ̂𝑊𝑢,𝑛, (9)
+where ̃𝑊𝑢,𝑛 is an embedding representation that captures the confound-
+ing relationship between the treatment variable and the outcome vari-
+able. Next, DIVRS combines ̂𝑊𝑢,𝑛 and ̃𝑊𝑢,𝑛 and recombines them into a 
+new treatment variable 𝑊 𝑟𝑒
+𝑢,𝑛: 
+𝑊 𝑟𝑒
+𝑢,𝑛 = 𝛼 ̂𝑤𝑢,𝑛 + (1 − 𝛼) ̃𝑤𝑢,𝑛, (10)
+where 𝛼 is a hyperparameter used to balance ̂𝑊𝑢,𝑛 with ̃𝑊𝑢,𝑛, that is, 
+balance the causal and confounding relationships of user behaviour.
+4.4.  Click prediction
+The DIVRS method leverages the reconstructed embedded represen-
+tations of the treatment variable 𝑊 𝑟𝑒
+𝑢,𝑛 for click prediction, a fundamen-
+tal task in recommender systems aimed at forecasting users’ click be-
+haviour on speciﬁc items. As with most mainstream recommendation 
+approaches, we use the following BPR loss function to optimise 𝑊 𝑟𝑒
+𝑢,𝑛 so 
+that it predicts the click probability well:
+𝑐𝑙𝑖𝑐𝑘 = −
+∑
+(𝑢,𝑛,𝑝)∈𝐷
+ln 𝜎((𝑤𝑟𝑒
+𝑢 , 𝑤𝑟𝑒
+𝑛 ) − (𝑤𝑟𝑒
+𝑢 , 𝑤𝑝)), (11)
+where 𝜎 is the sigmoid function.
+It should be emphasised that 𝑊 𝑜𝑟𝑖
+𝑢,𝑖  and 𝑊𝑢,𝑖 are not the same embed-
+ding representation, although both are composed of user-item pairs, as 
+shown in Fig. 5. Although both 𝑊 𝑜𝑟𝑖
+𝑢,𝑖  and 𝑊𝑢,𝑖 are deﬁned as treatment 
+variables, 𝑊 𝑜𝑟𝑖
+𝑢,𝑖  is only used to learn the IV 𝑆𝑢,𝑖 and does not participate 
+in the ﬁnal click prediction task. The treatment variable 𝑊𝑢,𝑖 is decom-
+posed and restructured by using the SIV 𝑆𝑢,𝑖, and the restructured em-
+bedding representation 𝑊 𝑟𝑒
+𝑢,𝑖 is then used for click prediction. Therefore, 
+our ﬁnal loss function is:
+𝐷𝐼𝑉 𝑅𝑆 = 𝑡𝑟𝑒 + 𝑐𝑜𝑟 + 𝑐𝑙𝑖𝑐𝑘 . (12)
+The GCN-based recommendation model (Chang et al., 2021; Liu 
+et al., 2021; Mao et al., 2021; Wu et al., 2022) represented by Light-
+GCN (He et al., 2020) has excellent performance in capturing user-item 
+interaction information and can greatly enhance the recommendation 
+eﬀect. It is currently the mainstream model in recommender systems. 
+Therefore, we also developed a GCN-based version of DIVRS, referred to 
+as DIVRS-GCN. The GCN-based model better captures the information 
+of user-item interaction through domain aggregation but is also more 
+likely to introduce the confounding relationship of user behaviour. To 
+avoid the learned IV representation being aﬀected by this relationship, 
+DIVRS-GCN employs OPR to make the IV representation as unaﬀected 
+by the confounding relationship as possible:
+𝑜𝑝𝑟 = 1
+𝑏
+𝑏∑
+(𝑢,𝑛)∈𝐷+
+(⟨𝑠𝑢,𝑛, ̃𝑤𝑢,𝑛
+⟩)2, (13)
+where 𝑏 is the batch size in model training. The ﬁnal loss function of 
+DIVRS-GCN is represented as follows:
+𝐺𝐶𝑁
+𝐷𝐼𝑉 𝑅𝑆 = 𝑡𝑟𝑒 + 𝑐𝑜𝑟 + 𝑐𝑙𝑖𝑐𝑘 + 𝑜𝑝𝑟. (14)
+DIVRS and DIVRS-GCN combine the loss functions of the above steps 
+to construct the ﬁnal loss function, which learns eﬀective IV from the 
+user’s historical behavioural data, and then uses the learned IV to de-
+compose the treatment variable into causal and confounding relation-
+ships, thus reducing the impact of bias on the recommender system and 
+improving the recommendation eﬀect.
+Table 1 
+Statistics of datasets after preprocessing.
+    Dataset  User #  Item #  Interaction # 
+  Movielens-10M  37,962  4819  1,371,473  
+  Douban-Movie  6809  15,012  173,766  
+5.  Experiments
+This section presents experiments conducted on two real-world 
+datasets to evaluate both the recommendation and debiasing perfor-
+mance of the DIVRS and DIVRS-GCN methods.
+5.1.  Experimental settings
+Datasets: In this paper, we conduct experiments using two publicly 
+real-world datasets: Movielens-10M and Douban-Movie. Both datasets 
+consist of user IDs, movie IDs, and user-provided ratings (ranging from 
+1 to 5) for movies, and they are widely used in research on debiasing 
+recommender systems. We refer to the method in DICE (Zheng et al., 
+2021) to preprocess these two datasets by binarizing the data according 
+to the movie ratings, assigning the ﬁve-star ratings in the dataset to 1, 
+and setting the rest of the ratings to 0, and using ten-core ﬁltering to 
+ﬁlter the data.
+In this paper, 40 % of the rating data is randomly sampled with 
+equal probability to represent unbiased recommendations under a com-
+pletely random strategy. From this subset, 10 % and 20 % are desig-
+nated as the validation and test sets, respectively. To meet the re-
+quirements of the CausE (Bonner & Vasile, 2018), 10 % of the unbi-
+ased data is incorporated into the training set, which is formed by 
+combining this portion with the remaining 60 % of unselected data. 
+This results in a 7 ∶ 2 ∶ 1  split for the training, test, and validation
+sets.
+This dataset preprocessing approach aims to create a realistic setting 
+by ensuring that the test data is unaﬀected by item popularity, giving 
+each item an equal probability of being recommended to users. In sum-
+mary, the model is trained on biased, standard data and evaluated on 
+unbiased data for inference. The statistics of the processed datasets are 
+presented in Table 1.
+Baseline: Causal inference-based debiasing methods are often used 
+as complementary techniques with backbone models. In our experi-
+ments, we employ two backbone models that are widely used in the 
+recommender systems domain: the MF and LightGCN.To evaluate the 
+performance of our approach, we compare it with the following ﬁve 
+causal inference-based debiasing methods:
+• IPS (Schnabel et al., 2016): This method mitigates the popularity 
+bias by addressing the skewness of the long-tailed distribution in the 
+dataset. It assigns weight scores to items that are inversely propor-
+tional to the item’s popularity, thereby magnifying the impact of less 
+popular items while reducing the dominance of more popular items.
+• IPS-C (Bottou et al., 2013): This approach limits the maximum value 
+of IPS weights to mitigate variance across the weight distribution.
+• CausE (Bonner & Vasile, 2018): This method addresses bias by utiliz-
+ing a biased dataset alongside a smaller, unbiased dataset. It applies 
+matrix factorization to both datasets to generate two distinct sets of 
+embeddings. Subsequently, 𝐿1 or 𝐿2 regularization techniques are 
+employed to align these embeddings, ensuring their congruence and 
+enforcing a degree of similarity between them.
+• DICE (Zheng et al., 2021): The method models user behaviour as “in-
+terest” and “conformity” components. It constructs speciﬁc training 
+data by means of a collision structure in causal inference that de-
+composes “interest” and “conformity” in user and item embeddings.
+• DCCL (Zhao et al., 2023): This study critiques DICE’s approach of us-
+ing speciﬁc data to disentangle “interest” and “conformity”, arguing 
+that it may introduce noise into the model. DCCL, on the other hand, 
+Neural Networks 193 (2026) 107977 
+6 
+==== PAGE 7 ====
+Z. Huang et al.
+employs contrastive learning to tackle data sparsity and achieve a 
+more precise disentanglement of “interest” and “conformity”.
+• PopGo (Zhang et al., 2024a): This study critiques the tendency of 
+user and item representations to learn popularity bias as a shortcut 
+in training data in mainstream recommendation models. PopGo uses 
+causal inference and information theory to quantify this shortcut and 
+mitigate popularity bias.
+DIVRS and DIVRS-GCN are not compared to IV4Rec (Si et al., 2022) 
+as the method is highly constrained for picking IV, whereas in reality, 
+most recommender system data do not have corresponding search data 
+in them, including the Movielens-10M and the Douban-Movie datasets 
+covered in this research do not have corresponding search data.
+Parameter Settings & Evaluation Metrics: To ensure a fair com-
+parison, the parameter settings are standardized across all methods in 
+this paper. For DICE, CausE and DCCL, the embedding size is set to 64 
+because they are composed of two sets of embeddings. For the other 
+models, the embedding size is standardized to 128. In the DIVRS ap-
+proach, the hyperparameters 𝛼 were set to 0.8 for the DIVRS and 0.95 
+and 0.8 for the DIVRS-GCN model when applied to the Movielens-10M 
+and Douban-Movie datasets, respectively.
+All methods used the Adam optimizer to update the model weights. 
+The loss functions of the compared algorithms are based on the BPR 
+function, except for the DICE and DCCL models. All models were trained 
+on NVIDIA A100 GPUs with 40GB of video memory. To assess the 
+performance of the models and validate the eﬀectiveness of DIVRS 
+and DIVRS-GCN, this paper employs three widely recognized metrics 
+in recommender systems: Recall, Hit Rate (HR), and Normalized Dis-
+counted Cumulative Gain (NDCG). The code of our DIVRS is available 
+at https://github.com/pwn1024/DIVRS.
+5.2.  Comparison of experimental results
+We show the results of DIVRS, DIVRS-GCN, and all baseline meth-
+ods on the Movielens-10M and Douban-Movie datasets in Tables 2 and 
+3. “Imp.” indicates the percentage improvement of the method on the 
+Table 2 
+The performance of all methods on movielens-10M.
+ Dataset  Movielens-10M
+ TopK=20  TopK=50
+ Backbone  Method  Recall↑  HR↑  NDCG↑  Imp.↑  Recall↑  HR↑  NDCG↑  Imp.↑
+MF
+ Original  0.1276  0.4397  0.0832  –  0.2332  0.6308  0.1156  –
+ IPS  0.1228  0.4210  0.0779 −3.76 %  0.2168  0.6016  0.1070 −7.03 %
+ IPS-C  0.1277  0.4335  0.0809  +0.08 %  0.2224  0.6150  0.1102 −4.63 %
+ CausE  0.1164  0.4144  0.0770 −8.77 %  0.2076  0.5940  0.1047 −10.98 %
+ DICE  0.1626  0.5202  0.1076  +27.42 %  0.2854  0.6941  0.1459  +22.38 %
+ DCCL  0.1503  0.4874  0.0975  +17.79 %  0.2636  0.6676  0.1326  +13.04 %
+ PopGo  0.1418  0.5081  0.0992  +11.13 %  0.2638  0.6987  0.1373  +13.13 %
+ DIVRS-Causal 0.1671 0.5282 0.1118 +30.96 % 0.2923 0.7018 0.1508 +25.34 %
+ DIVRS 0.16910.16910.1691 0.53020.53020.5302 0.11280.11280.1128 +32.52 %+32.52 %+32.52 % 0.29560.29560.2956 0.70410.70410.7041 0.15210.15210.1521 +26.76 %+26.76 %+26.76 %
+LightGCN
+ Original  0.1462  0.4831  0.0952  –  0.2631  0.6688  0.1316  –
+ IPS  0.1298  0.4438  0.0849 −11.22 %  0.2325  0.6196  0.1170 −11.63 %
+ IPS-C  0.1327  0.4533  0.0871 −9.23 %  0.2383  0.6302  0.1201 −9.43 %
+ CausE  0.1164  0.4099  0.0727 −20.38 %  0.2204  0.6080  0.1046 −16.23 %
+ DICE  0.1810  0.5564  0.1228  +23.80 %  0.3109  0.7219  0.1632  +18.17 %
+ DCCL  0.1462  0.4824  0.0947  0 %  0.2644  0.6711  0.1311  +0.49 %
+ PopGo  0.1748  0.5568  0.1194  +19.56 %  0.3032  0.7407  0.1591  +15.24 %
+ DIVRS-Causal 0.1831 0.5595 0.1240 +25.24 % 0.3121 0.7229 0.1641 +18.62 %
+ DIVRS-GCN 0.18380.18380.1838 0.56050.56050.5605 0.12470.12470.1247 +25.72 %+25.72 %+25.72 % 0.31380.31380.3138 0.72470.72470.7247 0.16500.16500.1650 +19.27 %+19.27 %+19.27 %
+Table 3 
+The performance of all methods on Douban-Movie.
+ Dataset  Douban-Movie
+ TopK=20  TopK=50
+ Backbone  Method  Recall↑  HR↑  NDCG↑  Imp.↑  Recall↑  HR↑  NDCG↑  Imp.↑
+MF
+ Original  0.0214  0.0542  0.0128  –  0.0371  0.0933  0.0171  –
+ IPS  0.0172  0.0444  0.0099 −19.63 %  0.0282  0.0755  0.0130 −23.99 %
+ IPS-C  0.0166  0.0446  0.0095 −22.43 %  0.0271  0.0761  0.0125 −26.95 %
+ CausE  0.0149  0.0410  0.0074 −30.37 %  0.0273  0.0761  0.0108 −26.42 %
+ DICE  0.0231  0.0615  0.0133  +7.94 %  0.0396  0.1012  0.0178  +6.74 %
+ DCCL  0.0217  0.0595  0.0123  +1.40 %  0.0385  0.1040  0.0170  +3.77 %
+ PopGo 0.0264 0.0688 0.0159 +23.36 % 0.0464 0.1190 0.0214 +25.07 %
+ DIVRS-Causal  0.0246  0.0660  0.0147  +14.95 %  0.0423  0.1119  0.0195  +14.02 %
+ DIVRS 0.02930.02930.0293 0.07500.07500.0750 0.01700.01700.0170 +36.92 %+36.92 %+36.92 % 0.04810.04810.0481 0.12340.12340.1234 0.02220.02220.0222 +29.65 %+29.65 %+29.65 %
+LightGCN
+ Original  0.0375  0.0557  0.0118  –  0.0640  0.0908  0.0155  –
+ IPS  0.0352  0.0928  0.0208 −6.13 %  0.0619  0.1576  0.0281 −3.28 %
+ IPS-C  0.0368  0.0980  0.0219 −1.87 %  0.0643  0.1657  0.0295 −4.69 %
+ CausE  0.0263  0.0693  0.0143 −29.87 %  0.0463  0.1216  0.0199 −27.66 %
+ DICE  0.0401  0.1088  0.0232  +6.93 %  0.0679  0.1755  0.0310  +6.09 %
+ DCCL  0.0401  0.1046  0.0225  +6.93 %  0.0693  0.1732  0.0306  +8.28 %
+ PopGo  0.0402  0.1074  0.0227  +7.20 %  0.0683  0.1760  0.0306  +6.71 %
+ DIVRS-Causal 0.0414 0.1154 0.0243 +10.40 % 0.0719 0.1912 0.0329 +12.34 %
+ DIVRS-GCN 0.04250.04250.0425 0.11630.11630.1163 0.02530.02530.0253 +13.33 %+13.33 %+13.33 % 0.07380.07380.0738 0.19500.19500.1950 0.03410.03410.0341 +15.31 %+15.31 %+15.31 %
+Neural Networks 193 (2026) 107977 
+7 
+==== PAGE 8 ====
+Z. Huang et al.
+recall metrics compared to the backbone model. The best results are 
+highlighted in bold, and the suboptimal results are underlined. DIVRS-
+Causal denotes click prediction using only ̂𝑊𝑢,𝑛 that capture the causal 
+relationship.
+By analysing Tables 2 and 3, the following conclusions can be 
+drawn. In the case of diﬀerent backbone networks for two diﬀer-
+ent datasets, both DIVRS, DIVRS-GCN and DIVRS-Causal achieve sig-
+niﬁcant performance improvement relative to the backbone mod-
+els (i.e., MF and LightGCN), with the highest percentage of
+improvement up to 36.92 %, which illustrates the validity and su-
+periority of IV learning and using the learned IV of our method. 
+Among them, DIVRS and DIVRS-GCN exhibit largely superior perfor-
+mance to DIVRS-Causal, suggesting that it is a reasonable and ef-
+fective approach to consider both causal and confounding relation-
+ships between the treatment and outcome variables in recommender
+systems.
+Further in-depth analysis of Tables 2 and 3 reveals that the IPS, 
+IPS-C and CausE methods are not stable for improving recommenda-
+tion eﬀectiveness, because they are not based on the mechanism of user 
+behavioural data generation, and only pursue the balance of item em-
+bedding weights or alignment with the embedding of unbiased data, 
+which makes it diﬃcult to cope with the complexity of real-world user 
+behaviour. In contrast, DICE, DCCL, PopGo, DIVRS and DIVRS-GCN 
+are based on causal graph analyses and they can maintain consistent 
+improvements across diﬀerent datasets, with our DIVRS and DIVRS-
+GCN showing the best performance. This implies that analysing the 
+user data generation mechanism at a high level can lead to better im-
+provement in recommendation results since most of the biases are un-
+observable. Among them, DCCL adds contrastive learning to DICE to 
+solve the data sparsity problem, but the result is not better than DICE. 
+This is because the dataset in our experiments is denser, so DCCL’s 
+strategy of augmenting the data by contrast learning does not achieve 
+greater improvement. It is worth noting that DIVRS and DIVRS-GCN 
+learn an IV from existing historical user behavioural data, implying that 
+our approach is more practical and maintains good recommendation
+results.
+5.3.  Evaluation on debiasing experiments ability
+In this section, the debiasing ability of DIVRS and DIVRS-GCN is 
+evaluated. We calculate the overlap between the items recommended 
+by all methods and the popular items on both datasets and use the In-
+tersection Over Union (IOU) (Zheng et al., 2021) as a metric to measure 
+the debiasing eﬀect of each method, where higher IOU indicates that 
+a larger proportion of the recommended items are popular. The higher 
+the IOU, the larger the proportion of popular items, implying that the 
+method is less capable of debiasing.
+Figs. 7 and 8 illustrate the IOU curves for each method on the two 
+datasets. In terms of the overall trend, DIVRS, DIVRS-GCN and DIVRS-
+Causal are all signiﬁcantly lower than most of the baseline methods, 
+suggesting that they have a stronger ability to reduce the preference 
+of popular items, which further validates the eﬀectiveness of our intro-
+duced SIV in mitigating the recommendation bias. It is worth noting 
+that under the MF backbone network of the ML10M dataset, although 
+PopGo obtains the lowest IOU value, its recommendation performance is 
+signiﬁcantly inferior to that of DIVRS (as shown in Table 2), suggesting 
+that it may have over-suppressed the popular information in the process 
+of de-biasing, which leads to a decrease in recommendation eﬀective-
+ness. In contrast, the DIVRS series of methods not only maintains lower 
+IOUs under multiple settings, but also outperforms all baseline methods 
+in terms of recommendation performance indicators, demonstrating a 
+more superior balance between debiasing ability and recommendation 
+eﬀect.
+Further analysis of the curves in Figs. 7 and 8 shows that the IOU 
+values of DIVRS and DIVRS-GCN are higher than that of DIVRS-Causal, 
+indicating that the items recommended by DIVRS (or DIVRS-GCN) have 
+a higher overlap with popular items. This phenomenon is plausible be-
+cause DIVRS (or DIVRS-GCN) considers both the causal relationship be-
+tween the treatment variable and the outcome variable and the con-
+founding relationships, i.e., various biases, which can make the model 
+tend to recommend popular items.
+After incorporating the confounding relationship, the debiasing 
+capabilities of DIVRS and DIVRS-GCN are weakened, but their
+Fig. 7. IOU ratio of recommended items overlapping with popular items on the Movielens-10M dataset for each method. (a) The debiasing eﬀects of each method 
+using MF as the backbone network. (b) The debiasing eﬀects of each method using LightGCN as the backbone network.
+Neural Networks 193 (2026) 107977 
+8 
+==== PAGE 9 ====
+Z. Huang et al.
+Fig. 8. IOU ratio of recommended items overlapping with popular items on the Douban-Movie dataset for each method. (a) The debiasing eﬀects of each method 
+using MF as the backbone network. (b) The debiasing eﬀects of each method using LightGCN as the backbone network.
+recommendation performance are improved. This is because popular 
+items account for a large share of user interactions, and with the debias-
+ing capability weakened, the proportion of popular items recommended 
+by the model increases, improving the recommendation performance. 
+This is consistent with the idea proposed in previous studies that not all 
+negative eﬀects are caused by bias (Zhao et al., 2022).
+This phenomenon illustrates the eﬀectiveness of our method in cap-
+turing both causal and confounding relationships and further validates 
+the eﬀectiveness of the IV learned from available user behavioural data. 
+In summary, the IV learned by DIVRS (or DIVRS-GCN) not only success-
+fully captures causal and confounding relationships between the treat-
+ment variables and the outcome variables but also eﬀectively mitigates 
+bias.
+By comparing the debiasing eﬀects of diﬀerent backbone networks 
+in Figs. 7 and 8, it can be seen that the proportion of IOUs for LightGCN 
+is signiﬁcantly higher than that of MF. This is because while LightGCN 
+uses the domain aggregation component to learn information about the 
+interactions between users and items, it also encodes the bias (i.e., con-
+founding relationship) between them into the embedding of the user-
+item pairs (the treatment variable) as well. Therefore, the degree of 
+bias will be greater in LightGCN compared to a non-linear model like
+MF.
+5.4.  Ablation studies
+We conducted comprehensive ablation studies to evaluate the eﬀec-
+tiveness of the individual components of DVIRS and DIVRS-GCN.
+5.4.1.  Eﬀects of SIV learnt
+To verify the eﬀectiveness of IV learning by DVIRS, we conducted 
+click prediction and ablation experiments based on diﬀerent treatment 
+variables on the Douban-Movie dataset using MF as the backbone net-
+work. Speciﬁcally, four treatment variables were used in the experi-
+ments respectively: the original treatment variable (i.e., MF), DIVRS-Res 
+(a variant of DIVRS that uses only the confounding relationship of the 
+embedding ̃𝑊𝑢,𝑖), DVIRS-Causal, and DVIRS.
+From Fig. 9(a), it can be observed that the DIVRS variant that uses 
+only the confounding relationship as a treatment variable (i.e. DIVRS-
+Res in the ﬁgure) has the lowest recall but highest IOU, i.e. the worst 
+recommendation and debiasing performance. This suggests that DIVRS-
+Res, using the learned IV, can successfully capture the confounding re-
+lationship of user behaviour, which partly reﬂects spurious correlations 
+due to various biases. Therefore, when using it for click prediction, it 
+tends to recommend popular items rather than items that match the 
+user’s preferences. Further analysis of Fig. 9(a) reveals that when us-
+ing DVIRS-Causal for click prediction, both its recommendation and 
+debiasing eﬀects are superior to the original treatment variables, in-
+dicating that using DVIRS-Causal can eﬀectively capture causal rela-
+tionships in user behavior. Overall, the IV we have learned can ef-
+fectively decompose the confounding and causal relationships of user
+behaviour.
+Fig. 9(b) is a partial enlargement of Fig. 9(a), in which the diﬀer-
+ence in the eﬀectiveness of click prediction using DIVRS-Causal versus 
+DVIRS is demonstrated. From Fig. 9(b), we can see that DVIRS has the 
+best recommendation eﬀect after integrating causal and confounding re-
+lationships. At the same time, the debiasing performance is worse than 
+that of DVIRS-Causal, which only uses causal relationships. This is be-
+cause the confounding relationships will make the model tend to rec-
+ommend popular items, but not all popular items will negatively aﬀect 
+the recommendation performance, so the recommendation performance 
+of DVIRS will be superior to DVIRS-Causal. Overall, Fig. 9 reﬂects the 
+eﬀectiveness of the design of DIVRS.
+5.4.2.  Eﬀects of OPR
+From Figs. 7 and 8 we can ﬁnd that LightGCN has a worse debias-
+ing ability than MF for the same dataset, since LightGCN uses domain 
+aggregation, which learns information about user-item interactions and 
+further introduces various biases. Therefore we further use OPR to opti-
+mise the IV learning for the backbone of domain aggregation and verify 
+the eﬀectiveness and necessity of OPR through ablation experiments on 
+the Douban-Movie dataset. Speciﬁcally, we compared the experimental 
+results of DIVRS and DIVRS-GCN with DIVRS-Causal to validate the ef-
+fectiveness and necessity of OPR. Note that DIVRS and DIVRS-Causal do 
+not incorporate the OPR technique.
+From Fig. 10(a), we can ﬁnd that without using OPR, the recommen-
+dation of DIVRS is worse than that of DIVRS-Causal, but the IOU value 
+of DIVRS is lower than that of DIVRS-Causal, which is not reasonable. 
+Neural Networks 193 (2026) 107977 
+9 
+==== PAGE 10 ====
+Z. Huang et al.
+Fig. 9. Comparison of recommendation and debiasing eﬀects using diﬀerent components as reconstructed treatment variables on the Douban-Movie dataset with 
+MF as the backbone. (a) Recommendation and debiasing eﬀects of MF, DIVRS and variant methods. (b) Recommendation and debiasing eﬀects of DIVRS-Causal and 
+DIVRS.
+Fig. 10. Comparison of recommendation and debiasing eﬀects before and after using the OPR component on the Douban-Movie dataset with LightGCN as the 
+backbone. (a) Recommended eﬀect and debiasing eﬀect of DIVRS without OPR component. (b) Recommended and debiasing eﬀects of DIVRS-GCN.
+Because DIVRS introduces the confounding relationship, it should have 
+higher IOU values than DIVRS-Causal. This suggests that DIVRS is un-
+able to learn a valid IV in backbone networks with domain aggregation 
+properties, for which we propose DIVRS-GCN to address this issue. On 
+the other hand, in Fig. 10(b), it can be seen that DIVRS-GCN outper-
+forms DIVRS-Causal in terms of recommendation, while the debiasing 
+eﬀect is worse than that of DIVRS-Causal, which is reasonable because 
+DIVRS-GCN introduces confounding relationship. The experimental re-
+sults in Fig. 10 provide ample evidence of the validity and necessity of 
+OPR for learning a valid IV.
+5.5.  Hyperparametric analysis
+In this subsection, we systematically explore the regulation mech-
+anism of the causal balance coeﬃcient 𝛼 on recommendation perfor-
+mance using the Douban-Movie dataset as an experimental benchmark. 
+By setting an asymptotic parameter space of 𝛼 ∈ {0.2, 0.4, 0.6, 0.8, 1.0}, 
+we reveal the non-linear mapping relationship between causal mod-
+elling strength and recommendation eﬀectiveness. The experimental 
+data show that at 𝛼 values ranging from 0.2 to 0.8, Recall exhibits a sig-
+niﬁcant monotonic growth trend with increasing 𝛼 values, from 0.0024 
+at 𝛼 = 0.2 to 0.0293 at 𝛼 = 0.8, which veriﬁes the positive impact of en-
+hanced causal inference weights on recommendation performance, as 
+shown in Fig. 11.
+In the low 𝛼 interval (𝛼 ≤ 0.4), the model is signiﬁcantly interfered 
+by confounding factors, and its user representations are easily misled 
+by spurious correlations. When 𝛼 = 0.2, the weight of causality is insuf-
+ﬁcient, which makes it diﬃcult for the recommender system to iden-
+tify the user’s real interest, and the Recall value is only 0.0024. As 𝛼
+increases to 0.6, the causality of user behaviour starts to dominate the 
+feature learning process, which can eﬀectively inhibit the inﬂuence of 
+confounding factors, and the Recall value jumps up by a magnitude of 
+7.8 times of the initial value, demonstrating that moderate causality 
+constraint can be a good solution to the problem of user behaviour. This 
+proves that moderate causal constraints can signiﬁcantly improve the 
+recommendation performance of the model.
+When the parameter 𝛼 is 0.8, the model achieves optimal recom-
+mendation performance; however, when 𝛼 = 1.0, i.e., when the model 
+makes recommendation decisions based solely on causal relationships in 
+user behaviour, performance actually declines. At ﬁrst glance, this seems 
+to contradict the common sense of causal inference that ‘confounding 
+factors introduce bias and aﬀect the accuracy of individual causal ef-
+fect estimates.’ However, our focus here is not estimating causal eﬀects, 
+but rather on optimizing predictive metrics such as Top-K recall rate. In 
+Neural Networks 193 (2026) 107977 
+10 
+==== PAGE 11 ====
+Z. Huang et al.
+Fig. 11. Recall@20 variation across 𝛼 parameters (0.2-1.0) with DIVRS on 
+Douban-Movie dataset.
+this case, confounding signals, such as user activity, though non-causal, 
+can be highly informative. Additionally, existing research (Zhao et al., 
+2022) has demonstrated that in real-world recommendation systems, 
+improving model performance when contextual information is sparse. 
+For example, features such as user activity and item popularity may 
+constitute confounding factors on non-causal paths, but they are highly 
+correlated with user behaviour and can enhance the model’s ability to 
+predict clicks or preferences in the absence of suﬃcient contextual in-
+formation. Therefore, at 𝛼=0.8, the model achieves a balance between 
+causal representation and statistical preference, thereby achieving opti-
+mal recommendation performance. This phenomenon also corroborates 
+the concept of ‘benign bias’ introduced by  Zhao et al. (2022), which 
+states that certain biases, though lacking causal explanatory power, con-
+tribute positively to system predictions in practical applications. Thus, 
+DIVRS not only eﬀectively learns causal relationships in user behaviour 
+but also accommodates the performance requirements of real-world
+systems.
+6.  Model eﬃciency analysis
+To verify the diﬀerence in runtime eﬃciency between DIVRS and 
+DIVRS-GCN, we measured the training time and model parameter count 
+on the Movielens-10M and Douban-Movie datasets. The speciﬁc results 
+are presented in Table 4. The parameter scales of DIVRS-GCN and DI-
+VRS are comparable, indicating that the introduction of graph convolu-
+tion operations does not signiﬁcantly increase model complexity. How-
+ever, the training time for DIVRS-GCN is signiﬁcantly longer than that 
+for DIVRS, primarily due to the increased computational burden caused 
+by iterative computations in GCNs. Nevertheless, considering the per-
+Table 4 
+Comparison of runtime and parameter counts for DIVRS and DIVRS-
+GCN on diﬀerent datasets.
+ Model  Dataset  Runtime per Epoch (s)  Parameters
+DIVRS  Movielens-10M  100.16  16.44M
+ Douban-Movie  22.59  8.40M
+DIVRS-GCN  Movielens-10M  628.55  16.43M
+ Douban-Movie  61.08  8.38M
+formance improvements brought by graph convolutions, this training 
+overhead remains within a reasonable range in practical applications.
+7.  Discussion
+In this study, we propose a debiased recommendation method based 
+on causal inference-Data-driven IV Representation Learning (DIVRS)-
+and integrate it with the GCN framework for enhancing recommen-
+dation quality in graph data, named DIVRS-GCN. Experimental re-
+sults demonstrate that DIVRS eﬀectively mitigates the inﬂuence of 
+latent confounding factors and outperforms traditional recommenda-
+tion models in accurately capturing users’ true preferences, thereby
+enhancing the personalization of recommendations. Furthermore, 
+DIVRS-GCN integrates OPR, achieving a better balance between 
+debiasing and accuracy. It maintains robust debiasing capability 
+within the GCN framework while further improving recommendation
+accuracy.
+DIVRS has two signiﬁcant advantages over existing causal debias-
+ing methods. First, DIVRS focuses on addressing the confounding bias 
+caused by latent confounders that bias recommender systems, rather 
+than only observable confounders, such as the eﬀect of item popular-
+ity. In contrast, DIVRS can be applied to a wider range of applications, 
+including variables that cannot be directly observed. Second, DIVRS re-
+covers SIVs directly from user-item interaction data, greatly reducing 
+the threshold of IV methods in recommendation systems. Traditional 
+IV-based debiasing methods often rely on domain experts’ knowledge 
+or additional external information to specify appropriate IVs. However, 
+obtaining such IV can be challenging due to privacy protection or data 
+access limitations. DIVRS, by contrast, employs a data-driven approach 
+to automatically mine appropriate SIVs without external information, 
+making the application of IV methods more practical and accessible in 
+recommender systems.
+Although these advantages, DIVRS has certain limitations. First, the 
+eﬀectiveness of the method depends on the quality of the learned SIVs, 
+which are derived from user-item interaction data. If the data is sparse or 
+user behavioural patterns are high complex, the stability of the SIV may 
+decline, reducing the accuracy of debiasing process. In addition, DIVRS-
+GCN introduces OPR on the GCN structure to mitigate the inﬂuence of 
+confounding factors. While OPR eﬀectively reduces confounding bias, 
+it also increases computational overhead. As GCNs are already com-
+putationally intensive on large-scale datasets, adding OPR may further 
+extend training times. Therefore, in practical applications, a trade-oﬀ 
+between the debiasing ability and computational eﬃciency is needed 
+to ensure that the recommender system still maintains good scalabil-
+ity and computational eﬃciency while improving the causal inference
+ability.
+To illustrate how DIVRS could be deployed in a real-world system, 
+consider a streaming media platform where user interaction logs are 
+continuously collected. DIVRS can utilise these interaction data to re-
+cover SIVs. During training, these SIVs are used to learn de-confused 
+user-item representations by mitigating confounding biases. At infer-
+ence time, the learned representations can be integrated into existing 
+retrieval and ranking modules, enabling the platform to generate higher-
+quality recommendation lists.
+8.  Conclusion
+In this paper, we have proposed a data-driven IV representation 
+learning method (DIVRS) for recovering the latent IV from existing user 
+historical behaviour data. The proposed DIVRS approach signiﬁcantly 
+alleviates the requirement of a given IV. By eﬀectively decomposing 
+causal and confounding relationships in user behaviours, the IV learned 
+directly from historical user behaviour data enables the recommenda-
+tion model to achieve both high-quality recommendations and debiasing 
+eﬀects. Additionally, for backbones with domain aggregation features, 
+DIVRS-GCN is proposed, which introduces the OPR technique on top of 
+Neural Networks 193 (2026) 107977 
+11 
+==== PAGE 12 ====
+Z. Huang et al.
+DIVRS to prevent bias from being introduced into SIV representations 
+during the domain aggregation process. We performed extensive exper-
+iments on the Movielens-10M and Douban-Movie datasets to assess the 
+eﬀectiveness and superiority of our DIVRS and DIVRS-GCN methods in 
+both recommendation and debiasing performance.
+As a natural extension, future work could explore integrating aux-
+iliary information (such as text comments or product attributes) into 
+the DIVRS (or DIVRS-GCN). These rich additional information sources 
+may help capture potential user intent and contextual signals, thereby 
+achieving more accurate and robust recommendation performance in 
+variable and complex real-world scenarios.
+CRediT authorship contribution statement
+Zhirong Huang: Writing – review & editing, Writing – original draft, 
+Visualization, Software, Methodology, Investigation, Conceptualization;
+Shichao Zhang: Writing – review & editing, Supervision, Project admin-
+istration, Funding acquisition; Debo Cheng: Writing – review & edit-
+ing, Methodology, Conceptualization; Jiuyong Li: Writing – review & 
+editing, Methodology; Lin Liu: Writing – review & editing, Investiga-
+tion; Guangquan Lu: Writing – review & editing, Project administra-
+tion; Guixian Zhang: Writing – review & editing, Methodology.
+Declaration of competing interest
+The authors declare that they have no known competing ﬁnancial 
+interests or personal relationships that could have appeared to inﬂuence 
+the work reported in this paper. 
+Acknowledgements
+This work is supported by the Project of Guangxi Science and Tech-
+nology (GuiKeAB23026040), Australian Research Council Discovery 
+Project (230101122), Research Fund of Guangxi Key Lab of Multi-source 
+Information Mining & Security (MIMS24-M-01), and Research Fund of 
+Guangxi Key Lab of Multi-source Information Mining & Security (24-A-
+01-02). 
+References
+Alamdari, P. M., Navimipour, N. J., Hosseinzadeh, M., Safaei, A. A., & Darwesh, A. (2020). 
+A systematic study on the recommender systems in the e-commerce. IEEE Access, 8, 
+115694–115716. 
+Bai, Y., Yang, E., Han, B., Yang, Y., Li, J., Mao, Y., Niu, G., & Liu, T. (2021). Understand-
+ing and improving early stopping for learning with noisy labels. Advances in Neural 
+Information Processing Systems, 34, 24392–24403. 
+Bonner, S., & Vasile, F. (2018). Causal embeddings for recommendation. In Proceedings of 
+the 12th ACM conference on recommender systems (p. 104–112). New York, NY, USA: 
+Association for Computing Machinery. 
+Bottou, L., Peters, J., Quiñonero-Candela, J., Charles, D. X., Chickering, D. M., Portugaly, 
+E., Ray, D., Simard, P., & Snelson, E. (2013). Counterfactual reasoning and learning 
+systems: The example of computational advertising. Journal of Machine Learning Re-
+search, 14(101), 3207–3260. 
+Bowden, R. J., & Turkington, D. A. (1990). Instrumental variables. 8. Cambridge university 
+press. 
+Cai, M., Hou, M., Chen, L., Wu, L., Bai, H., Li, Y., & Wang, M. (2024a). Mitigating recom-
+mendation biases via group-alignment and global-uniformity in representation learn-
+ing. ACM Transactions on Intelligent Systems and Technology, 15(5), 1–27. 
+Cai, R., Huang, Z., Chen, W., Hao, Z., & Zhang, K. (2023). Causal discovery with latent 
+confounders based on higher-order cumulants. In International conference on machine 
+learning (pp. 3380–3407). PMLR. 
+Cai, R., Wu, Y., Huang, X., Chen, W., Fu, T. Z. J., & Hao, Z. (2024b). Granger causal 
+representation learning for groups of time series. Science China Information Sciences, 
+67(5), 152103. 
+Chang, J., Gao, C., Zheng, Y., Hui, Y., Niu, Y., Song, Y., Jin, D., & Li, Y. (2021). Sequen-
+tial recommendation with graph neural networks. In Proceedings of the 44th interna-
+tional ACM SIGIR conference on research and development in information retrieval (pp. 
+378–387). 
+Chang, S., Zhang, Y., Tang, J., Yin, D., Chang, Y., Hasegawa-Johnson, M. A., & Huang, 
+T. S. (2017). Streaming recommender systems. In Proceedings of the 26th international 
+conference on world wide web (pp. 381–389). 
+Chen, J., Dong, H., Qiu, Y., He, X., Xin, X., Chen, L., Lin, G., & Yang, K. (2021). Autodebias: 
+Learning to debias for recommendation. In Proceedings of the 44th international ACM 
+SIGIR conference on research and development in information retrieval (pp. 21–30). 
+Chen, J., Dong, H., Wang, X., Feng, F., Wang, M., & He, X. (2023). Bias and debias in 
+recommender system: A survey and future directions. ACM Transactions on Information 
+Systems, 41(3), 1–39. 
+Chen, J., Wu, J., Chen, J., Xin, X., Li, Y., & He, X. (2024). How graph convolutions amplify 
+popularity bias for recommendation? Frontiers of Computer Science, 18(5), 185603. 
+Cheng, D., Li, J., Liu, L., Liu, J., & Le, T. D. (2024a). Data-driven causal eﬀect estimation 
+based on graphical causal modelling: A survey. ACM Computing Surveys, 56(5), 1–37. 
+Cheng, D., Li, J., Liu, L., Yu, K., Le, T. D., & Liu, J. (2023a). Discovering ancestral in-
+strumental variables for causal inference from observational data. IEEE Transactions 
+on Neural Networks and Learning Systems, 35(8), 11542–11552. 
+Cheng, D., Xu, Z., Li, J., Liu, L., Le, T. D., & Liu, J. (2023b). Learning conditional 
+instrumental variable representation for causal eﬀect estimation. In Joint European 
+conference on machine learning and knowledge discovery in databases (pp. 525–540).
+Springer. 
+Cheng, D., Xu, Z., Li, J., Liu, L., Liu, J., Gao, W., & Le, T. D. (2024b). Instrumental 
+variable estimation for causal inference in longitudinal data with time-dependent 
+latent confounders. In Proceedings of the AAAI conference on artiﬁcial intelligence
+(pp. 11480–11488). (vol. 38). 
+Cheng, D., Xu, Z., Li, J., Liu, L., Liu, J., & Le, T. D. (2023c). Causal inference with condi-
+tional instruments using deep generative models. In Proceedings of the AAAI conference 
+on artiﬁcial intelligence (pp. 7122–7130). (vol. 37).
+Cheng, D., Xu, Z., Li, J., Liu, L., Liu, J., & Le, T. D. (2023d). Conditional instrumental 
+variable regression with representation learning for causal inference. arXiv preprint 
+arXiv:2310.01865.
+He, X., Deng, K., Wang, X., Li, Y., Zhang, Y., & Wang, M. (2020). LightGCN: Simplify-
+ing and powering graph convolution network for recommendation. In Proceedings of 
+the 43rd international ACM SIGIR conference on research and development in information 
+retrieval (pp. 639–648). 
+He, X., Liao, L., Zhang, H., Nie, L., Hu, X., & Chua, T.-S. (2017). Neural collabora-
+tive ﬁltering. In Proceedings of the 26th international conference on world wide web
+(pp. 173–182). 
+He, Z.-Y., Lin, J.-Q., Wang, C.-D., & Guizani, M. (2025). Interaction-knowledge semantic 
+alignment for recommendation. Neural Networks, 181, 106755. 
+Hernan, M. A., & Robins, J. M. (2024). Causal inference: What if. Chapman & Hall/CRC 
+Monographs on Statistics & Applied Probab. CRC Press. 
+Ko, H., Lee, S., Park, Y., & Choi, A. (2022). A survey of recommendation systems: Recom-
+mendation models, techniques, and application ﬁelds. Electronics, 11(1), 141. 
+Koren, Y., Bell, R., & Volinsky, C. (2009). Matrix factorization techniques for recommender 
+systems. Computer, 42(8), 30–37. 
+Koren, Y., Rendle, S., & Bell, R. (2021). Advances in collaborative ﬁltering. Recommender 
+systems handbook, (pp. 91–142). 
+Li, H., Zheng, C., Wang, W., Wang, H., Feng, F., & Zhou, X.-H. (2024). Debiased recom-
+mendation with noisy feedback. In Proceedings of the 30th ACM SIGKDD conference on 
+knowledge discovery and data mining (pp. 1576–1586). 
+Lin, Y., Yao, Y., & Liu, T. (2024). Learning the latent causal structure for modeling label 
+noise. Advances in Neural Information Processing Systems, 37, 120549–120577. 
+Liu, F., Cheng, Z., Zhu, L., Gao, Z., & Nie, L. (2021). Interest-aware message-passing GCN 
+for recommendation. In Proceedings of the web conference 2021 (pp. 1296–1305). 
+Liu, T., & Tao, D. (2015). Classiﬁcation with noisy labels by importance reweighting. IEEE 
+Transactions on Pattern Analysis and Machine Intelligence, 38(3), 447–461. 
+Mansoury, M., Abdollahpouri, H., Pechenizkiy, M., Mobasher, B., & Burke, R. (2020). 
+Feedback loop and bias ampliﬁcation in recommender systems. In Proceedings 
+of the 29th ACM international conference on information & knowledge management
+(pp. 2145–2148). 
+Mao, K., Zhu, J., Xiao, X., Lu, B., Wang, Z., & He, X. (2021). UltraGCN: Ultra sim-
+pliﬁcation of graph convolutional networks for recommendation. In Proceedings 
+of the 30th ACM international conference on information & knowledge management
+(pp. 1253–1262). 
+Pearl, J. (2009). Causality. Cambridge university press. 
+Qiu, R., Huang, Z., Li, J., & Yin, H. (2020). Exploiting cross-session information for session-
+based recommendation with graph neural networks. ACM Transactions on Information 
+Systems (TOIS), 38(3), 1–23.
+Rendle, S., Freudenthaler, C., Gantner, Z., & Schmidt-Thieme, L. (2012). BPR: Bayesian 
+personalized ranking from implicit feedback. arXiv preprint arXiv:1205.2618.
+Roy, D., & Dutta, M. (2022). A systematic review and research perspective on recom-
+mender systems. Journal of Big Data, 9(1), 59. 
+Schnabel, T., Swaminathan, A., Singh, A., Chandak, N., & Joachims, T. (2016). Recom-
+mendations as treatments: Debiasing learning and evaluation. In Proceedings of the 33rd 
+international conference on machine learning (pp. 1670–1679). New York, New York, 
+USA: PMLR (vol. 48). 
+Si, Z., Han, X., Zhang, X., Xu, J., Yin, Y., Song, Y., & Wen, J.-R. (2022). A model-agnostic 
+causal learning framework for recommendation using search data. In Proceedings of the 
+ACM web conference 2022 (pp. 224–233). 
+Si, Z., Sun, Z., Zhang, X., Xu, J., Song, Y., Zang, X., & Wen, J.-R. (2023a). Enhancing 
+recommendation with search data in a causal learning manner. ACM Transactions on 
+Information Systems, 41(4), 1–31. 
+Si, Z., Sun, Z., Zhang, X., Xu, J., Zang, X., Song, Y., Gai, K., & Wen, J.-R. (2023b). When 
+search meets recommendation: Learning disentangled search representation for rec-
+ommendation. In Proceedings of the 46th international ACM SIGIR conference on research 
+and development in information retrieval (pp. 1313–1323). 
+Sun, W., Khenissi, S., Nasraoui, O., & Shafto, P. (2019). Debiasing the human-
+recommender system feedback loop in collaborative ﬁltering. In Companion proceedings 
+of the 2019 world wide web conference (pp. 645–651). 
+Ullah, S., Zaefarian, G., & Ullah, F. (2021). How to use instrumental variables in addressing 
+endogeneity? A step-by-step procedure for non-specialists. Industrial Marketing Manage-
+ment, 96, A1–A6. 
+Neural Networks 193 (2026) 107977 
+12 
+==== PAGE 13 ====
+Z. Huang et al.
+Wang, N., Qin, Z., Wang, X., & Wang, H. (2021). Non-clicks mean irrelevant? Propensity 
+ratio scoring as a correction. In Proceedings of the 14th ACM international conference on 
+web search and data mining (pp. 481–489). 
+Wang, X., He, X., Wang, M., Feng, F., & Chua, T.-S. (2019). Neural graph collaborative 
+ﬁltering. In Proceedings of the 42nd international ACM SIGIR conference on research and 
+development in information retrieval (pp. 165–174). 
+Wu, S., Sun, F., Zhang, W., Xie, X., & Cui, B. (2022). Graph neural networks in recom-
+mender systems: A survey. ACM Computing Surveys, 55(5), 1–37. 
+Xia, X., Liu, T., Han, B., Wang, N., Gong, M., Liu, H., Niu, G., Tao, D., & Sugiyama, M. 
+(2020). Part-dependent label noise: Towards instance-dependent label noise. Advances 
+in Neural Information Processing Systems, 33, 7597–7610. 
+Xu, S., Tan, J., Heinecke, S., Li, V. J., & Zhang, Y. (2023). Deconfounded causal collabo-
+rative ﬁltering. ACM Transactions on Recommender Systems, 1(4), 1–25. 
+Yao, Y., Liu, T., Gong, M., Han, B., Niu, G., & Zhang, K. (2021). Instance-dependent label-
+noise learning under a structural causal model. Advances in Neural Information Process-
+ing Systems, 34, 4409–4420. 
+Zhang, A., Ma, W., Zheng, J., Wang, X., & Chua, T.-S. (2024a). Robust collaborative ﬁl-
+tering to popularity distribution shift. ACM Transactions on Information Systems, 42(3), 
+1–25. 
+Zhang, G., Cheng, D., Yuan, G., & Zhang, S. (2024b). Learning fair representations via 
+rebalancing graph structure. Information Processing & Management, 61(1), 103570. 
+Zhang, G., Yuan, G., Cheng, D., Liu, L., Li, J., & Zhang, S. (2025). Disentangled contrastive 
+learning for fair graph representations. Neural Networks, 181, 106781. 
+Zhang, S., Li, J., & Li, Y. (2022). Reachable distance function for KNN classiﬁcation. IEEE 
+Transactions on Knowledge and Data Engineering, 35(7), 7382–7396. 
+Zhang, Y., Feng, F., He, X., Wei, T., Song, C., Ling, G., & Zhang, Y. (2021). Causal inter-
+vention for leveraging popularity bias in recommendation. In Proceedings of the 44th 
+international ACM SIGIR conference on research and development in information retrieval 
+(pp. 11–20). 
+Zhao, W., Tang, D., Chen, X., Lv, D., Ou, D., Li, B., Jiang, P., & Gai, K. (2023). Disen-
+tangled causal embedding with contrastive learning for recommender system. In Com-
+panion proceedings of the ACM web conference 2023 (p. 406-410). New York, NY, USA: 
+Association for Computing Machinery. 
+Zhao, Z., Chen, J., Zhou, S., He, X., Cao, X., Zhang, F., & Wu, W. (2022). Popularity bias 
+is not always evil: Disentangling benign and harmful bias for recommendation. IEEE 
+Transactions on Knowledge and Data Engineering, 35(10), 9920–9931. 
+Zheng, Y., Gao, C., Li, X., He, X., Li, Y., & Jin, D. (2021). Disentangling user interest 
+and conformity for recommendation with causal embedding. In Proceedings of the web 
+conference 2021 (pp. 2980–2991). 
+Neural Networks 193 (2026) 107977 
+13 
